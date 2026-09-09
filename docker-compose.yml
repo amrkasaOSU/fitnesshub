@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: fitnesshub-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fitnesshub
+      POSTGRES_USER: ${POSTGRES_USER:-fitnesshub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitnesshub_dev_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - fitnesshub_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fitnesshub}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: fitnesshub-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - fitnesshub_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    container_name: fitnesshub-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/fitnesshub
+      POSTGRES_USER: ${POSTGRES_USER:-fitnesshub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fitnesshub_dev_password}
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      COOKIE_SECURE: "false"
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: fitnesshub-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    ports:
+      - "3000:3000"
+
+volumes:
+  fitnesshub_postgres_data:
+  fitnesshub_redis_data:

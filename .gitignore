@@ -1,0 +1,36 @@
+# Env
+.env
+.env.local
+
+# Backend
+# Note: backend/.mvn/wrapper/ (maven-wrapper.jar, .properties, Downloader.java)
+# is intentionally NOT ignored - it must be committed for `./mvnw` to work
+# for anyone who clones the repo without Maven already installed.
+backend/target/
+*.class
+*.jar
+!backend/.mvn/wrapper/*.jar
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.env*.local
+frontend/next-env.d.ts
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testcontainers / misc
+.testcontainers.properties
+dump.rdb

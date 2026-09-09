@@ -1,0 +1,12 @@
+package com.fitnesshub.analytics;
+
+public enum AttentionFlag {
+    NO_WORKOUT_LOGGED,
+    LOW_ADHERENCE,
+    WEIGHT_TREND_STALLED,
+    CALORIE_TRACKING_INCONSISTENT,
+    STEP_TARGET_MISSED,
+    RECENT_PERFORMANCE_DROP,
+    NO_RECENT_CHECKIN,
+    HIGH_RPE_PATTERN
+}

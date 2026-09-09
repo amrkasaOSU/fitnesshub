@@ -1,0 +1,9 @@
+spring:
+  session:
+    store-type: none
+  data:
+    redis:
+      url: redis://localhost:6399
+fitnesshub:
+  seed:
+    enabled: false
