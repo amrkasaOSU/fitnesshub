@@ -13,6 +13,24 @@ export class ApiError extends Error {
   }
 }
 
+const NETWORK_ERROR_MESSAGE =
+  "Can't reach the server. Check that the backend is running, then try again.";
+
+/**
+ * `fetch` rejects only on a network-level failure - the server being down, DNS
+ * failing, a refused CORS preflight. An HTTP error status still resolves. Left
+ * alone, that rejection surfaces to the UI as the browser's raw
+ * "TypeError: Failed to fetch", so translate it into an ApiError like any other
+ * failure and give callers a single error type to render.
+ */
+async function fetchOrThrow(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw new ApiError(0, "NETWORK_ERROR", NETWORK_ERROR_MESSAGE);
+  }
+}
+
 function readCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
@@ -21,7 +39,13 @@ function readCookie(name: string): string | null {
 
 async function ensureCsrfCookie(): Promise<void> {
   if (readCookie("XSRF-TOKEN")) return;
-  await fetch(`${API_URL}/api/auth/csrf`, { credentials: "include" });
+  await fetchOrThrow(`${API_URL}/api/auth/csrf`, { credentials: "include" });
+}
+
+/** The `{ data }` / `{ error }` envelope every backend endpoint responds with. */
+interface ApiEnvelope {
+  data?: unknown;
+  error?: { code?: string; message?: string; details?: string[] };
 }
 
 interface RequestOptions {
@@ -59,7 +83,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     if (csrf) headers["X-XSRF-TOKEN"] = csrf;
   }
 
-  const response = await fetch(`${API_URL}${path}${buildQuery(options.query)}`, {
+  const response = await fetchOrThrow(`${API_URL}${path}${buildQuery(options.query)}`, {
     method,
     credentials: "include",
     headers,
@@ -71,11 +95,27 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   }
 
   const text = await response.text();
-  const json = text ? JSON.parse(text) : {};
+  let json: ApiEnvelope;
+  try {
+    json = (text ? JSON.parse(text) : {}) as ApiEnvelope;
+  } catch {
+    // Something that isn't our JSON envelope answered - a proxy error page, a
+    // gateway timeout. Don't let the raw SyntaxError reach the UI.
+    throw new ApiError(
+      response.status,
+      "INVALID_RESPONSE",
+      "The server returned an unexpected response."
+    );
+  }
 
   if (!response.ok) {
-    const err = json?.error ?? { code: "UNKNOWN", message: "Something went wrong." };
-    throw new ApiError(response.status, err.code, err.message, err.details ?? []);
+    const err = json.error;
+    throw new ApiError(
+      response.status,
+      err?.code ?? "UNKNOWN",
+      err?.message ?? "Something went wrong.",
+      err?.details ?? []
+    );
   }
 
   return json.data as T;

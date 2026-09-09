@@ -3,9 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Users } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type { ClientSummaryDto } from "@/lib/types";
+import { AddClientDialog } from "@/components/add-client-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -38,19 +39,37 @@ export default function CoachClientsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
-        <Input
-          placeholder="Search by name, email, or goal..."
-          className="w-72"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Search by name, email, or goal..."
+            className="w-72"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <AddClientDialog />
+        </div>
       </div>
 
       {isLoading && <Skeleton className="h-96" />}
 
-      {!isLoading && (
+      {!isLoading && (data ?? []).length === 0 && (
+        <Card>
+          <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
+            <Users className="h-8 w-8 text-muted-foreground" />
+            <div>
+              <p className="font-medium">No clients yet</p>
+              <p className="text-sm text-muted-foreground">
+                Invite someone to sign up, or create their account for them.
+              </p>
+            </div>
+            <AddClientDialog />
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && (data ?? []).length > 0 && (
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -89,7 +108,7 @@ export default function CoachClientsPage() {
                         {c.weeklyWeightChange ?? "—"}
                       </TableCell>
                       <TableCell>
-                        {c.adherencePercentage !== null ? `${c.adherencePercentage}%` : "—"}
+                        {c.adherencePercentage != null ? `${c.adherencePercentage}%` : "—"}
                       </TableCell>
                       <TableCell>
                         {c.lastWorkoutAt ? new Date(c.lastWorkoutAt).toLocaleDateString() : "Never"}

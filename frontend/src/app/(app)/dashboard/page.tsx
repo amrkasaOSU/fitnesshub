@@ -69,7 +69,7 @@ export default function DashboardPage() {
           icon={Scale}
           value={weight.current ?? "—"}
           subtext={
-            weight.weeklyChange !== null
+            weight.weeklyChange != null
               ? `${weight.weeklyChange > 0 ? "+" : ""}${weight.weeklyChange} this week`
               : weight.weeklyAverageMessage ?? undefined
           }

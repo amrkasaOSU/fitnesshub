@@ -36,7 +36,7 @@ export default function CoachDashboardPage() {
         <StatCard
           title="Avg Weekly Adherence"
           icon={TrendingDown}
-          value={data.averageWeeklyAdherence !== null ? `${data.averageWeeklyAdherence}%` : "—"}
+          value={data.averageWeeklyAdherence != null ? `${data.averageWeeklyAdherence}%` : "—"}
         />
         <StatCard
           title="Need Attention"
