@@ -34,7 +34,7 @@ check Swagger for exact field-level shapes.
 | Programs | `/api/programs`, `/api/programs/{id}/assign` | builder + assignment (coach-only writes) |
 | Clients | `/api/clients`, `/api/clients/{id}`, `/api/clients/{id}/{progress,workouts,nutrition,checkins}` | coach's client roster + per-client views |
 | Coach | `/api/coach/clients`, `/api/coach/clients/{id}/notes`, `/api/coach/conversations` | client creation, private notes, conversation list |
-| Workouts | `/api/workouts*`, `/api/sets/{id}` | today's workout, logging, completion, feedback |
+| Workouts | `/api/workouts*`, `/api/sets/{id}` | today's workout, the Mon-Sun week (`/week`), skipping with a reason (`/today/skip`), logging, completion, feedback |
 | Weight/Steps/Nutrition | `/api/weight*`, `/api/steps*`, `/api/nutrition*` | log + dashboard + history |
 | Goals/Check-ins | `/api/goals*`, `/api/checkins*` | |
 | Messaging/Notifications | `/api/messages*`, `/api/notifications*` | |

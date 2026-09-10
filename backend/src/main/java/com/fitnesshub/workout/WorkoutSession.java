@@ -43,6 +43,9 @@ public class WorkoutSession extends BaseEntity {
     @Column(nullable = false)
     private WorkoutSessionStatus status = WorkoutSessionStatus.NOT_STARTED;
 
+    @Column(name = "skip_reason", columnDefinition = "text")
+    private String skipReason;
+
     protected WorkoutSession() {
     }
 
@@ -116,5 +119,20 @@ public class WorkoutSession extends BaseEntity {
 
     public void setStatus(WorkoutSessionStatus status) {
         this.status = status;
+    }
+
+    public String getSkipReason() {
+        return skipReason;
+    }
+
+    /**
+     * Status and reason move together - a database CHECK constraint rejects a
+     * SKIPPED row with no reason, so there's no setter that can leave one half
+     * of that pair behind.
+     */
+    public void markSkipped(String reason) {
+        this.status = WorkoutSessionStatus.SKIPPED;
+        this.skipReason = reason;
+        this.completedAt = null;
     }
 }

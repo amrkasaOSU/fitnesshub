@@ -6,7 +6,10 @@ import com.fitnesshub.common.exception.ConflictException;
 import com.fitnesshub.common.exception.NotFoundException;
 import com.fitnesshub.exercise.Exercise;
 import com.fitnesshub.exercise.ExerciseRepository;
+import com.fitnesshub.coach.CoachClientRepository;
+import com.fitnesshub.coach.CoachClientStatus;
 import com.fitnesshub.notification.NotificationService;
+import com.fitnesshub.notification.NotificationType;
 import com.fitnesshub.program.ClientProgram;
 import com.fitnesshub.program.ClientProgramRepository;
 import com.fitnesshub.program.ClientProgramStatus;
@@ -26,7 +29,9 @@ import com.fitnesshub.workout.dto.CompleteWorkoutRequest;
 import com.fitnesshub.workout.dto.LogSetRequest;
 import com.fitnesshub.workout.dto.PreviousPerformanceDto;
 import com.fitnesshub.workout.dto.SetCompletionResult;
+import com.fitnesshub.user.UserRepository;
 import com.fitnesshub.workout.dto.UpdateSetRequest;
+import com.fitnesshub.workout.dto.WeekDayDto;
 import com.fitnesshub.workout.dto.WorkoutExerciseDto;
 import com.fitnesshub.workout.dto.WorkoutFeedbackDto;
 import com.fitnesshub.workout.dto.WorkoutSessionDto;
@@ -38,11 +43,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +73,8 @@ public class WorkoutService {
     private final ProgressionService progressionService;
     private final WorkoutFeedbackRepository workoutFeedbackRepository;
     private final NotificationService notificationService;
+    private final CoachClientRepository coachClientRepository;
+    private final UserRepository userRepository;
     private final CurrentUser currentUser;
     private final AuthorizationService authorizationService;
     private final AuditService auditService;
@@ -83,6 +92,8 @@ public class WorkoutService {
                            ProgressionService progressionService,
                            WorkoutFeedbackRepository workoutFeedbackRepository,
                            NotificationService notificationService,
+                           CoachClientRepository coachClientRepository,
+                           UserRepository userRepository,
                            CurrentUser currentUser,
                            AuthorizationService authorizationService,
                            AuditService auditService) {
@@ -99,6 +110,8 @@ public class WorkoutService {
         this.progressionService = progressionService;
         this.workoutFeedbackRepository = workoutFeedbackRepository;
         this.notificationService = notificationService;
+        this.coachClientRepository = coachClientRepository;
+        this.userRepository = userRepository;
         this.currentUser = currentUser;
         this.authorizationService = authorizationService;
         this.auditService = auditService;
@@ -114,6 +127,17 @@ public class WorkoutService {
      */
     @Transactional(readOnly = true)
     public Optional<ProgramDay> resolveTodayProgramDay(UUID clientId, String clientTimezone) {
+        return resolveProgramDayFor(clientId, clientTimezone, LocalDate.now(safeZone(clientTimezone)));
+    }
+
+    /**
+     * The same cycle walk for an arbitrary date, less any skips earlier in that
+     * date's Monday-Sunday week (see {@link #skipsEarlierInWeek}). Skipping
+     * Monday therefore makes Monday's session reappear on Tuesday, Tuesday's on
+     * Wednesday, and so on.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ProgramDay> resolveProgramDayFor(UUID clientId, String clientTimezone, LocalDate date) {
         Optional<ClientProgram> activeOpt = clientProgramRepository
                 .findFirstByClientIdAndStatusOrderByStartDateDesc(clientId, ClientProgramStatus.ACTIVE);
         if (activeOpt.isEmpty()) {
@@ -124,14 +148,40 @@ public class WorkoutService {
         if (days.isEmpty()) {
             return Optional.empty();
         }
-        ZoneId zone = safeZone(clientTimezone);
-        LocalDate today = LocalDate.now(zone);
-        long daysSinceStart = ChronoUnit.DAYS.between(active.getStartDate(), today);
+        long daysSinceStart = ChronoUnit.DAYS.between(active.getStartDate(), date);
         if (daysSinceStart < 0) {
             return Optional.empty();
         }
-        int index = (int) (daysSinceStart % days.size());
+        long shifted = daysSinceStart - skipsEarlierInWeek(clientId, clientTimezone, date);
+        if (shifted < 0) {
+            return Optional.empty();
+        }
+        int index = (int) (shifted % days.size());
         return Optional.of(days.get(index));
+    }
+
+    /**
+     * How many days the schedule has slid back by, for this date. Deliberately
+     * scoped to the containing Monday-Sunday week: every Monday the schedule
+     * snaps back to whatever the untouched cycle prescribes, so a skip late in
+     * the week pushes a session off the end of that week rather than bleeding
+     * into the next one. The count is derived from the SKIPPED sessions
+     * themselves, so there is no separate offset column to keep in sync.
+     *
+     * <p>Adherence deliberately does <em>not</em> apply this shift: what the
+     * coach planned for the week is what they planned, and a skipped session
+     * stays counted as missed. See docs/fitness-calculations.md.
+     */
+    private long skipsEarlierInWeek(UUID clientId, String clientTimezone, LocalDate date) {
+        ZoneId zone = safeZone(clientTimezone);
+        LocalDate weekStart = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        Instant from = weekStart.atStartOfDay(zone).toInstant();
+        Instant to = date.atStartOfDay(zone).toInstant();
+        if (!from.isBefore(to)) {
+            return 0;
+        }
+        return sessionRepository.countByClientIdAndStatusAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+                clientId, WorkoutSessionStatus.SKIPPED, from, to);
     }
 
     private ZoneId safeZone(String tz) {
@@ -158,6 +208,95 @@ public class WorkoutService {
         ProgramDay programDay = resolveTodayProgramDay(clientId, clientTimezone).orElse(null);
         WorkoutSession session = new WorkoutSession(clientId, programDay == null ? null : programDay.getId());
         return sessionRepository.save(session);
+    }
+
+    // ----------------------------------------------------------------- week
+
+    /**
+     * The client's Monday-Sunday week, already shifted for any skips, so the
+     * strip shows where each session actually landed rather than where the
+     * untouched cycle would have put it.
+     */
+    @Transactional(readOnly = true)
+    public List<WeekDayDto> weekSchedule(UUID clientId, String clientTimezone) {
+        ZoneId zone = safeZone(clientTimezone);
+        LocalDate today = LocalDate.now(zone);
+        LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+
+        List<WorkoutSession> weekSessions = sessionRepository.findByClientIdAndStartedAtBetween(
+                clientId,
+                weekStart.atStartOfDay(zone).toInstant(),
+                weekStart.plusDays(7).atStartOfDay(zone).toInstant());
+
+        List<WeekDayDto> week = new java.util.ArrayList<>(7);
+        for (int i = 0; i < 7; i++) {
+            LocalDate date = weekStart.plusDays(i);
+            ProgramDay day = resolveProgramDayFor(clientId, clientTimezone, date).orElse(null);
+            boolean restDay = day == null
+                    || programExerciseRepository.findByProgramDayIdOrderByOrderIndexAsc(day.getId()).isEmpty();
+
+            WorkoutSession session = weekSessions.stream()
+                    .filter(s -> LocalDate.ofInstant(s.getStartedAt(), zone).equals(date))
+                    .max(Comparator.comparing(WorkoutSession::getStartedAt))
+                    .orElse(null);
+
+            week.add(new WeekDayDto(
+                    date,
+                    date.getDayOfWeek().name(),
+                    date.equals(today),
+                    date.isBefore(today),
+                    day == null ? null : day.getId(),
+                    day == null ? null : day.getName(),
+                    restDay,
+                    session == null ? null : session.getId(),
+                    session == null ? null : session.getStatus(),
+                    session == null ? null : session.getSkipReason(),
+                    skipsEarlierInWeek(clientId, clientTimezone, date) > 0));
+        }
+        return week;
+    }
+
+    /**
+     * Marks today's session SKIPPED with the client's reason and tells their
+     * coach. Everything left in the week slides down a day as a consequence -
+     * that falls out of {@link #skipsEarlierInWeek} rather than being written
+     * anywhere, so there is no stored schedule that can drift out of sync.
+     */
+    @Transactional
+    public WorkoutSession skipToday(UUID clientId, String clientTimezone, String reason) {
+        WorkoutSession session = getOrCreateTodaySession(clientId, clientTimezone);
+        if (session.getStatus() == WorkoutSessionStatus.COMPLETED) {
+            throw new ConflictException("This workout is already completed and can't be skipped.");
+        }
+        if (session.getStatus() == WorkoutSessionStatus.SKIPPED) {
+            throw new ConflictException("This workout has already been skipped.");
+        }
+        session.markSkipped(reason);
+        session = sessionRepository.save(session);
+
+        notifyCoachOfSkip(clientId, session, reason);
+        auditService.record(clientId, AuditAction.WORKOUT_SKIPPED, "WorkoutSession", session.getId());
+        return session;
+    }
+
+    private void notifyCoachOfSkip(UUID clientId, WorkoutSession session, String reason) {
+        coachClientRepository.findFirstByClientIdAndStatus(clientId, CoachClientStatus.ACTIVE)
+                .ifPresent(link -> {
+                    String name = userRepository.findById(clientId)
+                            .map(u -> u.getFirstName() + " " + u.getLastName())
+                            .orElse("A client");
+                    String dayName = session.getProgramDayId() == null ? "their workout"
+                            : programDayRepository.findById(session.getProgramDayId())
+                                    .map(ProgramDay::getName)
+                                    .orElse("their workout");
+                    notificationService.notify(
+                            link.getCoachId(),
+                            NotificationType.WORKOUT_SKIPPED,
+                            name + " skipped " + dayName,
+                            reason,
+                            "WorkoutSession",
+                            session.getId());
+                });
     }
 
     @Transactional
@@ -219,7 +358,7 @@ public class WorkoutService {
                 session.getId(), day == null ? "Workout" : day.getName(), session.getStatus(),
                 session.getStartedAt(), session.getCompletedAt(), session.getDurationSeconds(),
                 session.getNotes(), session.getOverallRpe(), session.getEnergyLevel(),
-                totalVolume, countPrsForSession(session), exerciseDtos, feedback);
+                totalVolume, countPrsForSession(session), exerciseDtos, feedback, session.getSkipReason());
     }
 
     private WorkoutExerciseDto buildExerciseDto(WorkoutSession session, UUID exerciseId, String exerciseName,
@@ -397,7 +536,7 @@ public class WorkoutService {
         BigDecimal avgRpe = progressionService.averageRpe(sets);
         return new WorkoutSummaryDto(session.getId(), day == null ? "Workout" : day.getName(),
                 session.getStartedAt(), session.getDurationSeconds(), volume, avgRpe, session.getStatus(),
-                countPrsForSession(session));
+                countPrsForSession(session), session.getSkipReason());
     }
 
     private int countPrsForSession(WorkoutSession session) {

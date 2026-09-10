@@ -30,7 +30,6 @@ export default function ProgressPage() {
     .map((s) => ({
       date: new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
       estimated1Rm: s.estimated1Rm,
-      volume: s.volume,
     }));
 
   return (
@@ -93,22 +92,6 @@ export default function ProgressPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Volume over time</CardTitle>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="date" fontSize={12} />
-                  <YAxis fontSize={12} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="volume" stroke="var(--chart-2)" strokeWidth={2} dot />
-                </LineChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
         </>
       )}
     </div>

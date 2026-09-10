@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 const suggestions = [
   "Should I attempt a heavier bench press today?",
   "Why has my squat progress stalled?",
-  "How has my training volume changed this month?",
+  "Is my protein intake supporting my goal?",
   "Am I training consistently enough?",
 ];
 

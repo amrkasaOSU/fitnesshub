@@ -83,6 +83,7 @@ export interface WorkoutSessionDto {
   prCount: number;
   exercises: WorkoutExerciseDto[];
   feedback: WorkoutFeedbackDto[];
+  skipReason?: string | null;
 }
 
 export interface WorkoutSummaryDto {
@@ -94,6 +95,22 @@ export interface WorkoutSummaryDto {
   averageRpe: number | null;
   status: WorkoutSessionDto["status"];
   prCount: number;
+  skipReason?: string | null;
+}
+
+/** One square in the Monday-Sunday week strip on the client's Today page. */
+export interface WeekDayDto {
+  date: string;
+  dayOfWeek: string;
+  today: boolean;
+  past: boolean;
+  programDayId?: string | null;
+  programDayName?: string | null;
+  restDay: boolean;
+  sessionId?: string | null;
+  status?: WorkoutSessionDto["status"] | null;
+  skipReason?: string | null;
+  shifted: boolean;
 }
 
 export interface WeightDashboardDto {

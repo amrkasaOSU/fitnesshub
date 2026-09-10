@@ -45,8 +45,8 @@ export default function WorkoutHistoryPage() {
                 </div>
                 <div className="flex items-center gap-2 text-right">
                   <div>
-                    <p className="text-sm font-medium">{w.totalVolume.toLocaleString()} lb</p>
-                    <p className="text-xs text-muted-foreground">volume</p>
+                    <p className="text-sm font-medium">{w.averageRpe ?? "—"}</p>
+                    <p className="text-xs text-muted-foreground">avg RPE</p>
                   </div>
                   {w.prCount > 0 && <Badge>{w.prCount} PR{w.prCount > 1 ? "s" : ""}</Badge>}
                   <Badge variant={w.status === "COMPLETED" ? "secondary" : "outline"}>

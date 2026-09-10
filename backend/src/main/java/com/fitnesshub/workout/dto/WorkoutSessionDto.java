@@ -20,6 +20,7 @@ public record WorkoutSessionDto(
         BigDecimal totalVolume,
         int prCount,
         List<WorkoutExerciseDto> exercises,
-        List<WorkoutFeedbackDto> feedback
+        List<WorkoutFeedbackDto> feedback,
+        String skipReason
 ) {
 }

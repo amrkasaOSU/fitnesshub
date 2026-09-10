@@ -24,6 +24,8 @@ export default function WorkoutDetailPage({ params }: { params: Promise<{ id: st
     );
   }
 
+  const completedSetCount = session.exercises.reduce((n, e) => n + e.completedSets.length, 0);
+
   return (
     <div className="space-y-4">
       <Card>
@@ -36,7 +38,9 @@ export default function WorkoutDetailPage({ params }: { params: Promise<{ id: st
               </p>
             </div>
             <div className="text-right">
-              <p className="font-medium">{session.totalVolume.toLocaleString()} lb volume</p>
+              <p className="font-medium">
+                {completedSetCount} {completedSetCount === 1 ? "set" : "sets"}
+              </p>
               {session.prCount > 0 && <Badge className="mt-1">{session.prCount} PR{session.prCount > 1 ? "s" : ""}</Badge>}
             </div>
           </div>

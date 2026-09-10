@@ -9,8 +9,10 @@ import type {
   GoalDto,
   PageResponse,
   TrainingSummaryDto,
+  WeightDashboardDto,
   WorkoutSummaryDto,
 } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,6 +39,11 @@ export default function CoachClientDetailPage({ params }: { params: Promise<{ id
   const { data: progress } = useQuery({
     queryKey: ["client", id, "progress"],
     queryFn: () => api.get<TrainingSummaryDto>(`/api/clients/${id}/progress`),
+  });
+
+  const { data: weight } = useQuery({
+    queryKey: ["client", id, "weight"],
+    queryFn: () => api.get<WeightDashboardDto>("/api/weight/dashboard", { clientId: id }),
   });
 
   const { data: workouts } = useQuery({
@@ -67,6 +74,13 @@ export default function CoachClientDetailPage({ params }: { params: Promise<{ id
     return <Skeleton className="h-96" />;
   }
 
+  // Distance to target, stated without direction: a cut and a bulk both read
+  // as "X to go", which avoids implying a direction the goal doesn't specify.
+  const toTarget =
+    weight?.current != null && client.targetWeight != null
+      ? Math.abs(weight.current - client.targetWeight).toFixed(1)
+      : null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -87,14 +101,28 @@ export default function CoachClientDetailPage({ params }: { params: Promise<{ id
         <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard title="Goal" value={client.fitnessGoal?.replace("_", " ") ?? "—"} />
-            <StatCard title="Target weight" value={client.targetWeight ?? "—"} />
+            <StatCard
+              title="Current weight"
+              value={weight?.current ?? "—"}
+              subtext={
+                weight?.weeklyChange != null
+                  ? `${weight.weeklyChange > 0 ? "+" : ""}${weight.weeklyChange} this week`
+                  : undefined
+              }
+              accent={weight?.weeklyChange != null && weight.weeklyChange < 0 ? "positive" : "default"}
+            />
+            <StatCard
+              title="Target weight"
+              value={client.targetWeight ?? "—"}
+              subtext={toTarget != null ? `${toTarget} to go` : undefined}
+            />
             <StatCard title="Adherence (30d)" value={progress?.adherencePercentage ? `${progress.adherencePercentage}%` : "—"} />
-            <StatCard title="PRs (30d)" value={progress?.prCount ?? 0} />
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard title="Workouts completed (30d)" value={progress?.workoutsCompleted ?? 0} />
             <StatCard title="Total sets (30d)" value={progress?.totalSets ?? 0} />
-            <StatCard title="Total volume (30d)" value={progress?.totalVolume ?? 0} />
             <StatCard title="Avg RPE (30d)" value={progress?.averageRpe ?? "—"} />
+            <StatCard title="PRs (30d)" value={progress?.prCount ?? 0} />
           </div>
         </TabsContent>
 
@@ -108,11 +136,24 @@ export default function CoachClientDetailPage({ params }: { params: Promise<{ id
                 <p className="text-sm text-muted-foreground">No workouts logged yet.</p>
               )}
               {workouts?.data.map((w) => (
-                <div key={w.id} className="flex justify-between border-b py-2 text-sm last:border-0">
-                  <span>{w.dayName}</span>
-                  <span className="text-muted-foreground">
-                    {new Date(w.startedAt).toLocaleDateString()} · {w.totalVolume} lb
-                  </span>
+                <div key={w.id} className="border-b py-2 text-sm last:border-0">
+                  <div className="flex justify-between">
+                    <span className="flex items-center gap-2">
+                      {w.dayName}
+                      {w.status === "SKIPPED" && (
+                        <Badge className="bg-amber-500 hover:bg-amber-500">Skipped</Badge>
+                      )}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {new Date(w.startedAt).toLocaleDateString()}
+                      {w.averageRpe != null ? ` · RPE ${w.averageRpe}` : ""}
+                    </span>
+                  </div>
+                  {w.skipReason && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Reason: &ldquo;{w.skipReason}&rdquo;
+                    </p>
+                  )}
                 </div>
               ))}
             </CardContent>

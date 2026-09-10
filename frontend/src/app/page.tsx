@@ -21,7 +21,7 @@ const features = [
   {
     icon: TrendingUp,
     title: "Progressive Overload",
-    body: "Estimated 1RM, volume trends, and personal records - calculated automatically from every set you log.",
+    body: "Estimated 1RM, performance trends, and personal records - calculated automatically from every set you log.",
   },
   {
     icon: Apple,

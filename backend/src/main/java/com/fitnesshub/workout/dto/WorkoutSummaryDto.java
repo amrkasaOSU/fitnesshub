@@ -14,6 +14,7 @@ public record WorkoutSummaryDto(
         BigDecimal totalVolume,
         BigDecimal averageRpe,
         WorkoutSessionStatus status,
-        int prCount
+        int prCount,
+        String skipReason
 ) {
 }

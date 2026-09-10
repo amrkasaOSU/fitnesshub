@@ -82,6 +82,30 @@ twice in one planned slot) raise `completedWorkouts` but the percentage is
 capped at 100% - adherence rewards showing up for what was planned, it
 doesn't further reward overtraining relative to the plan.
 
+### Skipped workouts and the weekly shift
+
+A client can skip a day with a reason (`POST /api/workouts/today/skip`). Two
+things follow, and they're deliberately independent:
+
+1. **The rest of that week shifts down a day.** `WorkoutService` resolves each
+   date as `(daysSinceStart - skipsEarlierInWeek) % cycleLength`, where the
+   skip count is scoped to the containing **Monday-Sunday** week. Skipping
+   Wednesday makes Wednesday's session reappear on Thursday, Thursday's on
+   Friday, and so on; every Monday the schedule snaps back to the untouched
+   cycle. A skip late in the week therefore pushes a session off the end of
+   that week rather than bleeding into the next one - that loss is intended,
+   not a bug. The shift is derived from the SKIPPED sessions themselves, so
+   there's no stored offset that can drift out of sync with them.
+
+2. **Adherence does not move.** `AdherenceService` keeps computing `planned`
+   from the *unshifted* cycle: what the coach prescribed for the week is what
+   they prescribed, and a skipped day stays planned-but-not-completed, so it
+   counts as missed. An explained skip is context for the coach, not an
+   excused absence - the reason travels to them as a `WORKOUT_SKIPPED`
+   notification and shows on the client's workout history. If you ever want
+   skips excused instead, that's a change to `AdherenceService`, not to the
+   shift logic.
+
 ## Attention flags
 
 `AttentionFlagService` computes a deterministic `Set<AttentionFlag>` per

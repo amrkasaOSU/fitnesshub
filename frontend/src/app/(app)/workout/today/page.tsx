@@ -12,6 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { RestTimer } from "@/components/rest-timer";
+import { WeekStrip } from "@/components/week-strip";
+import { SkipWorkoutDialog } from "@/components/skip-workout-dialog";
 import { usePendingSetQueue } from "@/lib/use-pending-set-queue";
 
 interface SetInput {
@@ -102,11 +104,14 @@ export default function TodayWorkoutPage() {
   }
 
   const isCompleted = session.status === "COMPLETED";
+  const isSkipped = session.status === "SKIPPED";
 
   return (
     <div className="space-y-4 pb-24">
+      <WeekStrip />
+
       <Card>
-        <CardContent className="flex items-center justify-between py-4">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
           <div>
             <h1 className="text-xl font-bold">{session.dayName}</h1>
             <p className="text-sm text-muted-foreground">
@@ -116,14 +121,29 @@ export default function TodayWorkoutPage() {
               )}
             </p>
           </div>
-          {!isCompleted && (
-            <Button onClick={() => completeWorkout.mutate()} disabled={completeWorkout.isPending}>
-              Finish Workout
-            </Button>
-          )}
-          {isCompleted && <Badge variant="secondary">Completed</Badge>}
+          <div className="flex items-center gap-2">
+            {!isCompleted && !isSkipped && (
+              <>
+                <SkipWorkoutDialog />
+                <Button onClick={() => completeWorkout.mutate()} disabled={completeWorkout.isPending}>
+                  Finish Workout
+                </Button>
+              </>
+            )}
+            {isCompleted && <Badge variant="secondary">Completed</Badge>}
+            {isSkipped && <Badge className="bg-amber-500 hover:bg-amber-500">Skipped</Badge>}
+          </div>
         </CardContent>
       </Card>
+
+      {isSkipped && session.skipReason && (
+        <Card>
+          <CardContent className="py-4 text-sm">
+            <span className="font-medium">You skipped this workout:</span>{" "}
+            <span className="text-muted-foreground">&ldquo;{session.skipReason}&rdquo;</span>
+          </CardContent>
+        </Card>
+      )}
 
       {activeRest && (
         <RestTimer seconds={activeRest.seconds} onDismiss={() => setActiveRest(null)} key={activeRest.exerciseId + activeRest.seconds} />

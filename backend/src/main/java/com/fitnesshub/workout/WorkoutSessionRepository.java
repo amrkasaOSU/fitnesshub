@@ -24,4 +24,12 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     List<WorkoutSession> findCompletedForClient(@Param("clientId") UUID clientId);
 
     long countByClientIdAndStatusAndStartedAtBetween(UUID clientId, WorkoutSessionStatus status, Instant from, Instant to);
+
+    /**
+     * Half-open [from, to), unlike ...Between which includes both ends. Used to
+     * count the skips that happened strictly before a given day, where a session
+     * starting exactly at midnight must not fall on both sides of the boundary.
+     */
+    long countByClientIdAndStatusAndStartedAtGreaterThanEqualAndStartedAtLessThan(
+            UUID clientId, WorkoutSessionStatus status, Instant from, Instant to);
 }

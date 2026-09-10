@@ -11,6 +11,8 @@ import com.fitnesshub.workout.dto.CreateFeedbackRequest;
 import com.fitnesshub.workout.dto.CreateWorkoutRequest;
 import com.fitnesshub.workout.dto.LogSetRequest;
 import com.fitnesshub.workout.dto.SetCompletionResult;
+import com.fitnesshub.workout.dto.SkipWorkoutRequest;
+import com.fitnesshub.workout.dto.WeekDayDto;
 import com.fitnesshub.workout.dto.WorkoutFeedbackDto;
 import com.fitnesshub.workout.dto.WorkoutSessionDto;
 import com.fitnesshub.workout.dto.WorkoutSummaryDto;
@@ -29,6 +31,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -52,6 +55,20 @@ public class WorkoutController {
     public ApiResponse<WorkoutSessionDto> today() {
         User user = userRepository.findById(currentUser.id()).orElseThrow();
         WorkoutSession session = workoutService.getOrCreateTodaySession(currentUser.id(), user.getTimezone());
+        return ApiResponse.of(workoutService.toDto(session));
+    }
+
+    /** The caller's own Monday-Sunday week, already shifted for any skips. */
+    @GetMapping("/week")
+    public ApiResponse<List<WeekDayDto>> week() {
+        User user = userRepository.findById(currentUser.id()).orElseThrow();
+        return ApiResponse.of(workoutService.weekSchedule(currentUser.id(), user.getTimezone()));
+    }
+
+    @PostMapping("/today/skip")
+    public ApiResponse<WorkoutSessionDto> skipToday(@Valid @RequestBody SkipWorkoutRequest request) {
+        User user = userRepository.findById(currentUser.id()).orElseThrow();
+        WorkoutSession session = workoutService.skipToday(currentUser.id(), user.getTimezone(), request.reason());
         return ApiResponse.of(workoutService.toDto(session));
     }
 

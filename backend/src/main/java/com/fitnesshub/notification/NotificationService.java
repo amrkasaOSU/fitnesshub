@@ -58,6 +58,9 @@ public class NotificationService {
             case COACH_FEEDBACK -> NotificationPreference::isCoachFeedbackNotifications;
             case GOAL_MILESTONE -> NotificationPreference::isGoalMilestoneNotifications;
             case SUBSCRIPTION -> p -> true;
+            // A client skipping a session is something their coach needs in
+            // order to do their job, so it isn't behind a client-set preference.
+            case WORKOUT_SKIPPED -> p -> true;
         };
         return check.test(prefs);
     }
