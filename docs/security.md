@@ -103,6 +103,16 @@ including themselves - attempting it returns 403.
   schema but there is no email-sending integration, so a locked-out client goes
   through their coach rather than a "forgot password" link.
 - **Email verification** on registration, for the same reason.
-- Rate limiting is implemented for AI requests (Redis-backed, see
-  [docs/ai.md](ai.md)); general login-attempt rate limiting is not yet wired
-  up. Flagging this explicitly rather than leaving it undocumented.
+## Login throttling
+
+`LoginRateLimiter` counts failed sign-ins in Redis against two independent
+keys - the email being tried and the caller's IP. Each stops a different
+attack: per-email catches someone hammering one account from many addresses,
+per-IP catches someone spraying one common password across many accounts,
+which never trips a per-email counter. Ten failures in fifteen minutes blocks
+further attempts, including ones with the correct password, and the refusal is
+worded identically whether or not the account exists so it can't be used to
+discover which emails are registered. A successful login clears both counters,
+so someone who mistypes twice and then gets in is never affected. Behind a load
+balancer the first hop of `X-Forwarded-For` is used, since the socket address
+would otherwise be the proxy for every request.

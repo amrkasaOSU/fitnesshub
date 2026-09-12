@@ -4,6 +4,7 @@ import com.fitnesshub.audit.AuditAction;
 import com.fitnesshub.audit.AuditService;
 import com.fitnesshub.auth.dto.LoginRequest;
 import com.fitnesshub.auth.dto.RegisterRequest;
+import com.fitnesshub.common.exception.RateLimitExceededException;
 import com.fitnesshub.common.web.ApiResponse;
 import com.fitnesshub.security.FitnessHubUserDetails;
 import com.fitnesshub.user.User;
@@ -19,6 +20,7 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
@@ -41,19 +43,22 @@ public class AuthController {
     private final UserMapper userMapper;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private final LoginRateLimiter loginRateLimiter;
 
     public AuthController(AuthService authService,
                            AuthenticationManager authenticationManager,
                            SecurityContextRepository securityContextRepository,
                            UserMapper userMapper,
                            UserRepository userRepository,
-                           AuditService auditService) {
+                           AuditService auditService,
+                           LoginRateLimiter loginRateLimiter) {
         this.authService = authService;
         this.authenticationManager = authenticationManager;
         this.securityContextRepository = securityContextRepository;
         this.userMapper = userMapper;
         this.userRepository = userRepository;
         this.auditService = auditService;
+        this.loginRateLimiter = loginRateLimiter;
     }
 
     /** Forces the CSRF token cookie to be issued. The frontend calls this once before login/register. */
@@ -87,13 +92,43 @@ public class AuthController {
 
     private void establishSession(LoginRequest request,
                                    HttpServletRequest httpRequest, HttpServletResponse httpResponse) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.email().toLowerCase(), request.password()));
+        String email = request.email().toLowerCase();
+        String ip = clientIp(httpRequest);
+
+        if (loginRateLimiter.isBlocked(email, ip)) {
+            // Deliberately identical whether or not the account exists, so this
+            // can't be used to discover which emails are registered.
+            throw new RateLimitExceededException(
+                    "Too many failed sign-in attempts. Try again in "
+                            + loginRateLimiter.windowMinutes() + " minutes.");
+        }
+
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(email, request.password()));
+        } catch (AuthenticationException e) {
+            loginRateLimiter.recordFailure(email, ip);
+            throw e;
+        }
+        loginRateLimiter.recordSuccess(email, ip);
 
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
         securityContextRepository.saveContext(context, httpRequest, httpResponse);
+    }
+
+    /**
+     * Behind a platform load balancer the socket address is the proxy, so prefer
+     * the first hop in X-Forwarded-For when one is present.
+     */
+    private String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 
     /** Exposed for tests / debugging only; real identity comes from FitnessHubUserDetails. */

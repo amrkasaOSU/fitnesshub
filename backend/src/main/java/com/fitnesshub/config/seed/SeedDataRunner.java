@@ -53,6 +53,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,6 +79,10 @@ import java.util.UUID;
  */
 @Component
 @ConditionalOnProperty(name = "fitnesshub.seed.enabled", havingValue = "true", matchIfMissing = true)
+// Hard backstop independent of the flag above: these demo accounts use a
+// password published in the public README, so they must never be creatable on
+// a production instance - not even by a misconfigured environment variable.
+@Profile("!prod")
 public class SeedDataRunner implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(SeedDataRunner.class);

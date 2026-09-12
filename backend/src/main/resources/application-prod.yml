@@ -1,0 +1,35 @@
+# Activated with SPRING_PROFILES_ACTIVE=prod.
+#
+# The base application.yml is tuned for local development, where seeding demo
+# data and an open Swagger UI are conveniences. Inheriting those defaults in
+# production would be actively dangerous, so this profile overrides each one.
+# SeedDataRunner additionally carries @Profile("!prod") as a hard backstop, so
+# demo accounts cannot be created here even if the flag below were flipped.
+
+fitnesshub:
+  seed:
+    # The seeded demo accounts use a password published in the public README.
+    # Creating them on a live instance would hand anyone a coach login.
+    enabled: false
+  cookie:
+    # Session cookies must never travel in the clear. Requires HTTPS, which
+    # every supported host terminates for you.
+    secure: true
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+spring:
+  jpa:
+    # Never let Hibernate touch the schema in production; Flyway owns it.
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+logging:
+  level:
+    root: INFO
+    com.fitnesshub: INFO

@@ -70,6 +70,13 @@ fitnesshub:
     secure: ${COOKIE_SECURE:false}
     domain: ${COOKIE_DOMAIN:}
     same-site: ${COOKIE_SAME_SITE:Lax}
+  auth:
+    login-rate-limit:
+      # Failed sign-ins only; a success clears the counters. Counted per email
+      # and per client IP so neither hammering one account nor spraying one
+      # password across many accounts gets through.
+      max-attempts: 10
+      window-minutes: 15
   ai:
     provider: openai
     openai:
