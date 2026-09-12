@@ -9,6 +9,8 @@ import java.util.UUID;
 
 public record WorkoutSessionDto(
         UUID id,
+        /** Null when no program is assigned - distinct from a prescribed rest day, which has an id and no exercises. */
+        UUID programDayId,
         String dayName,
         WorkoutSessionStatus status,
         Instant startedAt,

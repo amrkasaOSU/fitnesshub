@@ -189,39 +189,20 @@ public class SeedDataRunner implements CommandLineRunner {
 
     // ---------------------------------------------------------------- core
 
+    /**
+     * The exercise library lives in Flyway migration V12 because it's reference
+     * data every environment needs - a coach can't build a program without it,
+     * and production doesn't run this seeder. So look up what the migration
+     * inserted rather than creating duplicates.
+     */
     private Map<String, Exercise> seedExercises() {
-        Object[][] defs = {
-                {"Bench Press", MuscleGroup.CHEST, Equipment.BARBELL, MovementPattern.PUSH_HORIZONTAL},
-                {"Incline Dumbbell Press", MuscleGroup.CHEST, Equipment.DUMBBELL, MovementPattern.PUSH_HORIZONTAL},
-                {"Cable Fly", MuscleGroup.CHEST, Equipment.CABLE, MovementPattern.ISOLATION},
-                {"Push-up", MuscleGroup.CHEST, Equipment.BODYWEIGHT, MovementPattern.PUSH_HORIZONTAL},
-                {"Barbell Row", MuscleGroup.BACK, Equipment.BARBELL, MovementPattern.PULL_HORIZONTAL},
-                {"Seated Cable Row", MuscleGroup.BACK, Equipment.CABLE, MovementPattern.PULL_HORIZONTAL},
-                {"Lat Pulldown", MuscleGroup.BACK, Equipment.CABLE, MovementPattern.PULL_VERTICAL},
-                {"Pull-up", MuscleGroup.BACK, Equipment.BODYWEIGHT, MovementPattern.PULL_VERTICAL},
-                {"Overhead Press", MuscleGroup.SHOULDERS, Equipment.BARBELL, MovementPattern.PUSH_VERTICAL},
-                {"Lateral Raise", MuscleGroup.SHOULDERS, Equipment.DUMBBELL, MovementPattern.ISOLATION},
-                {"Face Pull", MuscleGroup.SHOULDERS, Equipment.CABLE, MovementPattern.ISOLATION},
-                {"Bicep Curl", MuscleGroup.BICEPS, Equipment.DUMBBELL, MovementPattern.ISOLATION},
-                {"Tricep Pushdown", MuscleGroup.TRICEPS, Equipment.CABLE, MovementPattern.ISOLATION},
-                {"Squat", MuscleGroup.QUADS, Equipment.BARBELL, MovementPattern.SQUAT},
-                {"Leg Press", MuscleGroup.QUADS, Equipment.MACHINE, MovementPattern.SQUAT},
-                {"Leg Extension", MuscleGroup.QUADS, Equipment.MACHINE, MovementPattern.ISOLATION},
-                {"Walking Lunge", MuscleGroup.QUADS, Equipment.DUMBBELL, MovementPattern.LUNGE},
-                {"Romanian Deadlift", MuscleGroup.HAMSTRINGS, Equipment.BARBELL, MovementPattern.HINGE},
-                {"Leg Curl", MuscleGroup.HAMSTRINGS, Equipment.MACHINE, MovementPattern.ISOLATION},
-                {"Deadlift", MuscleGroup.BACK, Equipment.BARBELL, MovementPattern.HINGE},
-                {"Hip Thrust", MuscleGroup.GLUTES, Equipment.BARBELL, MovementPattern.HINGE},
-                {"Calf Raise", MuscleGroup.CALVES, Equipment.MACHINE, MovementPattern.ISOLATION},
-                {"Plank", MuscleGroup.CORE, Equipment.BODYWEIGHT, MovementPattern.ISOLATION},
-                {"Kettlebell Swing", MuscleGroup.FULL_BODY, Equipment.KETTLEBELL, MovementPattern.HINGE},
-        };
         Map<String, Exercise> byName = new HashMap<>();
-        for (Object[] d : defs) {
-            Exercise e = new Exercise((String) d[0], (MuscleGroup) d[1], (Equipment) d[2], (MovementPattern) d[3]);
-            e.setDescription("Standard " + d[0] + " performed with controlled tempo and full range of motion.");
-            e = exerciseRepository.save(e);
+        for (Exercise e : exerciseRepository.findAll()) {
             byName.put(e.getName(), e);
+        }
+        if (byName.isEmpty()) {
+            throw new IllegalStateException(
+                    "Exercise library is empty - migration V12 should have populated it.");
         }
         return byName;
     }

@@ -71,6 +71,8 @@ export interface WorkoutFeedbackDto {
 
 export interface WorkoutSessionDto {
   id: string;
+  /** Null when no program is assigned - distinct from a prescribed rest day. */
+  programDayId?: string | null;
   dayName: string;
   status: "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "SKIPPED";
   startedAt: string;
@@ -369,4 +371,38 @@ export interface ProgressPhotoDto {
   contentType: string;
   sizeBytes: number;
   createdAt: string;
+}
+
+export interface ProgramExerciseDto {
+  id: string;
+  exerciseId: string;
+  exerciseName: string;
+  orderIndex: number;
+  sets: number;
+  targetReps: number;
+  targetWeight?: number | null;
+  targetRpe?: number | null;
+  restSeconds?: number | null;
+  tempo?: string | null;
+  notes?: string | null;
+  progressionStrategy?: string | null;
+}
+
+export interface ProgramDayDto {
+  id: string;
+  dayNumber: number;
+  name: string;
+  description?: string | null;
+  exercises: ProgramExerciseDto[];
+}
+
+export interface ProgramDto {
+  id: string;
+  coachId: string;
+  name: string;
+  description?: string | null;
+  durationWeeks: number;
+  goal: FitnessGoal;
+  version: number;
+  days: ProgramDayDto[];
 }

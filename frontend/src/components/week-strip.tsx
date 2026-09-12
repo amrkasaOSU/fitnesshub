@@ -34,6 +34,23 @@ export function WeekStrip() {
   if (!week) return null;
 
   const skipped = week.filter((d) => d.status === "SKIPPED");
+  // Every day resolving to no program day means nothing is assigned at all -
+  // very different from a week the program happens to fill with rest days.
+  const noProgram = week.every((d) => !d.programDayId);
+
+  if (noProgram) {
+    return (
+      <Card>
+        <CardContent className="py-10 text-center">
+          <p className="font-medium">No program yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Your coach hasn&apos;t assigned your training program yet. Your week will show up here
+            once they do - you can still log weight, steps, and nutrition in the meantime.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>

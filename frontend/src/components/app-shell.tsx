@@ -16,6 +16,7 @@ import {
   CalendarDays,
   ClipboardList,
   Camera,
+  CalendarRange,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useCurrentUser, useLogout } from "@/lib/use-auth";
@@ -46,6 +47,7 @@ const clientNav = [
 const coachNav = [
   { href: "/coach/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/coach/clients", label: "Clients", icon: Users },
+  { href: "/coach/programs", label: "Programs", icon: CalendarRange },
   { href: "/coach/checkins", label: "Check-ins", icon: ClipboardList },
   { href: "/coach/messages", label: "Messages", icon: MessageSquare },
   { href: "/coach/ai", label: "AI Insights", icon: Sparkles },

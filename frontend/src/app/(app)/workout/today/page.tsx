@@ -105,6 +105,10 @@ export default function TodayWorkoutPage() {
 
   const isCompleted = session.status === "COMPLETED";
   const isSkipped = session.status === "SKIPPED";
+  // No program day resolved at all - the coach hasn't assigned a program.
+  // A prescribed rest day is different: it has a programDayId and no exercises.
+  const noProgram = !session.programDayId;
+  const isRestDay = !noProgram && session.exercises.length === 0;
 
   return (
     <div className="space-y-4 pb-24">
@@ -113,16 +117,22 @@ export default function TodayWorkoutPage() {
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
           <div>
-            <h1 className="text-xl font-bold">{session.dayName}</h1>
+            <h1 className="text-xl font-bold">
+              {noProgram ? "Nothing scheduled" : isRestDay ? "Rest day" : session.dayName}
+            </h1>
             <p className="text-sm text-muted-foreground">
-              {progress.done} / {progress.total} exercises
+              {noProgram
+                ? "Your coach hasn't assigned a program yet."
+                : isRestDay
+                  ? "No training prescribed today. Rest is part of the plan."
+                  : `${progress.done} / ${progress.total} exercises`}
               {pending.length > 0 && (
                 <span className="ml-2 text-amber-600">· {pending.length} waiting to sync</span>
               )}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {!isCompleted && !isSkipped && (
+            {!isCompleted && !isSkipped && !noProgram && !isRestDay && (
               <>
                 <SkipWorkoutDialog />
                 <Button onClick={() => completeWorkout.mutate()} disabled={completeWorkout.isPending}>

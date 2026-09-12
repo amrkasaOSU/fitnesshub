@@ -355,7 +355,8 @@ public class WorkoutService {
                 .toList();
 
         return new WorkoutSessionDto(
-                session.getId(), day == null ? "Workout" : day.getName(), session.getStatus(),
+                session.getId(), session.getProgramDayId(),
+                day == null ? "Workout" : day.getName(), session.getStatus(),
                 session.getStartedAt(), session.getCompletedAt(), session.getDurationSeconds(),
                 session.getNotes(), session.getOverallRpe(), session.getEnergyLevel(),
                 totalVolume, countPrsForSession(session), exerciseDtos, feedback, session.getSkipReason());

@@ -50,8 +50,14 @@ strictly weaker. Using one domain avoids the problem instead of mitigating it.
 2. Deploy the backend with the variables above. Flyway migrates on boot.
 3. **Register your own coach account** through the UI. There are no seeded
    accounts in production, by design - you create the first user yourself.
+   The 24-exercise library ships as migration V12, so it's there before you
+   log in; only demo *users* are absent.
 4. Deploy the frontend with `NEXT_PUBLIC_API_URL` pointing at the backend.
-5. Sign in, add a client, and log one workout before inviting anyone.
+5. Build a program (Programs -> New program), add your client, and assign it.
+   A client with no program assigned sees "No program yet" and cannot log
+   workouts, so assignment is part of onboarding, not an afterthought.
+6. Sign in as the client with the temporary password and log one set yourself
+   before handing the account over.
 
 ## Operational notes
 
