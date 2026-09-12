@@ -4,6 +4,7 @@ import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useFeatures } from "@/lib/use-features";
+import { ChangePasswordCard } from "@/components/change-password-card";
 import { api } from "@/lib/api-client";
 import { useCurrentUser } from "@/lib/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,6 +64,8 @@ export default function SettingsPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <ChangePasswordCard />
 
       <Card>
         <CardHeader>

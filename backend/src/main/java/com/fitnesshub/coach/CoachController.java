@@ -3,6 +3,7 @@ package com.fitnesshub.coach;
 import com.fitnesshub.coach.dto.CoachNoteDto;
 import com.fitnesshub.coach.dto.CreateClientRequest;
 import com.fitnesshub.coach.dto.CreateNoteRequest;
+import com.fitnesshub.coach.dto.ResetClientPasswordRequest;
 import com.fitnesshub.common.web.ApiResponse;
 import com.fitnesshub.user.User;
 import com.fitnesshub.user.UserMapper;
@@ -38,6 +39,13 @@ public class CoachController {
     public ResponseEntity<ApiResponse<UserDto>> createClient(@Valid @RequestBody CreateClientRequest request) {
         User client = coachClientService.createClient(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.of(userMapper.toDto(client)));
+    }
+
+    @PostMapping("/clients/{id}/password")
+    public ResponseEntity<Void> resetClientPassword(@PathVariable UUID id,
+                                                     @Valid @RequestBody ResetClientPasswordRequest request) {
+        coachClientService.resetClientPassword(id, request.temporaryPassword());
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/clients/{id}/notes")

@@ -82,10 +82,27 @@ changes. Subscription tier/status is **only** ever written from a verified
 webhook event or the checkout-session lookup it triggers - the frontend
 cannot set its own plan.
 
+## Password management
+
+`POST /api/users/me/password` changes the caller's own password. The current
+password is re-verified server-side even though the request is already
+authenticated - holding a live session is not by itself enough to lock the real
+owner out of their account. The new password must differ from the current one
+and meets the same 8-character minimum as registration.
+
+`POST /api/coach/clients/{id}/password` lets a coach set a temporary password
+for a client who is locked out, gated by `assertCoachOwnsClient`. Recovery runs
+through the coach on purpose: there is no email delivery in this system, and a
+coach already knows their client personally, so they are a stronger identity
+check than an email inbox would be. A client cannot call this for anyone,
+including themselves - attempting it returns 403.
+
 ## Not implemented yet
 
-- Email verification and password-reset flows have the necessary schema
-  fields (`User.emailVerified`) but no email-sending integration.
+- **Self-service password reset by email.** `User.emailVerified` exists in the
+  schema but there is no email-sending integration, so a locked-out client goes
+  through their coach rather than a "forgot password" link.
+- **Email verification** on registration, for the same reason.
 - Rate limiting is implemented for AI requests (Redis-backed, see
   [docs/ai.md](ai.md)); general login-attempt rate limiting is not yet wired
   up. Flagging this explicitly rather than leaving it undocumented.

@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
 import { PhotoGallery } from "@/components/photo-gallery";
+import { ResetClientPasswordDialog } from "@/components/reset-client-password-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
@@ -84,11 +85,17 @@ export default function CoachClientDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {client.firstName} {client.lastName}
-        </h1>
-        <p className="text-sm text-muted-foreground">{client.email}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {client.firstName} {client.lastName}
+          </h1>
+          <p className="text-sm text-muted-foreground">{client.email}</p>
+        </div>
+        <ResetClientPasswordDialog
+          clientId={id}
+          clientName={`${client.firstName} ${client.lastName}`}
+        />
       </div>
 
       <Tabs defaultValue="overview">

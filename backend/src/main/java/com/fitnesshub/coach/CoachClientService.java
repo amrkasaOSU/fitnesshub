@@ -82,6 +82,23 @@ public class CoachClientService {
         this.adherenceService = adherenceService;
     }
 
+    /**
+     * Sets a temporary password for a client who can't get in. There's no email
+     * delivery in this system, so account recovery deliberately runs through the
+     * coach - who already knows the client personally and can hand it over
+     * directly. Restricted to the coach who actually owns this client.
+     */
+    @Transactional
+    public void resetClientPassword(UUID clientId, String temporaryPassword) {
+        UUID coachId = currentUser.id();
+        authorizationService.assertCoachOwnsClient(coachId, clientId);
+        User client = userRepository.findById(clientId)
+                .orElseThrow(() -> new NotFoundException("Client not found."));
+        client.setPasswordHash(passwordEncoder.encode(temporaryPassword));
+        userRepository.save(client);
+        auditService.record(coachId, AuditAction.CLIENT_PASSWORD_RESET, "User", clientId);
+    }
+
     @Transactional
     public User createClient(CreateClientRequest request) {
         UUID coachId = currentUser.id();

@@ -1,11 +1,14 @@
 package com.fitnesshub.user;
 
 import com.fitnesshub.common.web.ApiResponse;
+import com.fitnesshub.user.dto.ChangePasswordRequest;
 import com.fitnesshub.user.dto.UpdateUserRequest;
 import com.fitnesshub.user.dto.UserDto;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,5 +33,11 @@ public class UserController {
     @PatchMapping("/me")
     public ApiResponse<UserDto> updateMe(@Valid @RequestBody UpdateUserRequest request) {
         return ApiResponse.of(userMapper.toDto(userService.updateCurrentUser(request)));
+    }
+
+    @PostMapping("/me/password")
+    public ResponseEntity<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        userService.changeOwnPassword(request);
+        return ResponseEntity.noContent().build();
     }
 }

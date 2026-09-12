@@ -28,12 +28,12 @@ check Swagger for exact field-level shapes.
 | Domain | Base path | Notes |
 |---|---|---|
 | Auth | `/api/auth/*` | register, login, logout, csrf |
-| Users | `/api/users/me` | get/update own profile |
+| Users | `/api/users/me`, `/api/users/me/password` | get/update own profile; change own password |
 | Dashboard | `/api/dashboard`, `/api/coach/dashboard` | role-dispatched client/coach dashboard |
 | Exercises | `/api/exercises`, `/api/exercises/{id}/progress`, `/api/coach/exercises` | library + per-exercise progress + custom exercise creation |
 | Programs | `/api/programs`, `/api/programs/{id}/assign` | builder + assignment (coach-only writes) |
 | Clients | `/api/clients`, `/api/clients/{id}`, `/api/clients/{id}/{progress,workouts,nutrition,checkins}` | coach's client roster + per-client views |
-| Coach | `/api/coach/clients`, `/api/coach/clients/{id}/notes`, `/api/coach/conversations` | client creation, private notes, conversation list |
+| Coach | `/api/coach/clients`, `/api/coach/clients/{id}/{notes,password}`, `/api/coach/conversations` | client creation, private notes, temporary-password reset for a locked-out client, conversation list |
 | Workouts | `/api/workouts*`, `/api/sets/{id}` | today's workout, the Mon-Sun week (`/week`), skipping with a reason (`/today/skip`), logging, completion, feedback |
 | Weight/Steps/Nutrition | `/api/weight*`, `/api/steps*`, `/api/nutrition*` | log + dashboard + history |
 | Goals/Check-ins | `/api/goals*`, `/api/checkins*`, `/api/coach/checkins` | client submits a weekly check-in; coach reads the pending queue and replies |
