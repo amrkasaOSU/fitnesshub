@@ -44,10 +44,10 @@ constructing the service directly with `null` for any collaborator the method
 under test doesn't touch. That's why they run in milliseconds and don't need
 Testcontainers.
 
-**Testcontainers-based integration tests and Playwright E2E tests are
-described in the product spec but not included in this pass** - they need a
-real Docker daemon, which wasn't available in the sandbox this project was
-initially built in (see below). The seams for them exist (repositories,
+**Testcontainers-based integration tests and Playwright E2E tests are a
+known gap.** Both need a Docker daemon, which the machine this was built on
+doesn't have (see below for how the stack was verified anyway). The seams for
+them exist (repositories,
 `AuthorizationService`, and the REST controllers are all plain Spring beans
 a `@SpringBootTest` + Testcontainers Postgres could exercise directly) - this
 is flagged as a known gap, not silently skipped.
@@ -59,44 +59,46 @@ npm run lint        # eslint
 npm run build       # production build (also type-checks)
 ```
 
-## How this was verified without Docker
+## Verifying without Docker
 
-The environment this project was first built in had no Docker daemon, no
-Homebrew, and no system Postgres/Redis/Node/Maven. Rather than skip
-verification, the whole stack was stood up from portable, non-system-installed
+My development machine has no Docker daemon, no Homebrew, and no system
+Postgres/Redis/Node/Maven. Rather than skip integration verification and hope
+the code was right, I stood the whole stack up from portable, non-system
 binaries:
 
-- **Maven & Node**: official binary tarballs, extracted to a local directory
-  and added to `PATH` for the session - no different from a CI runner
-  downloading them.
-- **PostgreSQL**: the actual `postgres`/`initdb`/`pg_ctl` binaries embedded
-  inside the `io.zonky.test.postgres:embedded-postgres-binaries-darwin-arm64v8`
-  Maven artifact, extracted directly (without pulling in the whole Java
-  library) - this is real PostgreSQL 18, not a mock.
-- **Redis**: built from source (`make BUILD_TLS=no`) - Redis's core has no
-  external dependencies beyond a C compiler, so `redis-server`/`redis-cli`
-  built in under two minutes even with the optional modules (RediSearch,
-  RedisJSON) failing to build.
+- **Maven & Node**: official binary tarballs extracted to a local directory and
+  put on `PATH` - the same thing a CI runner does on every job.
+- **PostgreSQL**: the real `postgres`/`initdb`/`pg_ctl` binaries embedded in the
+  `io.zonky.test.postgres:embedded-postgres-binaries-darwin-arm64v8` Maven
+  artifact, extracted directly without pulling in the Java wrapper library.
+  This is actual PostgreSQL, not an in-memory substitute like H2.
+- **Redis**: built from source (`make BUILD_TLS=no`). Redis's core has no
+  dependencies beyond a C compiler, so it builds in about two minutes.
 
-Against that real Postgres + Redis, the backend was booted, all 9 Flyway
-migrations applied, the seed data ran, and the full auth → dashboard →
-workout-logging → PR-detection → messaging → AI (graceful "not configured")
-→ coach-notes pipeline was exercised end-to-end via `curl` and, for the
-frontend, the in-app Browser tool (screenshots in the session transcript).
-**One real bug was caught this way**: Hibernate's `hibernate.order_inserts`
-optimization reordered `workout_sets` inserts ahead of their parent
-`workout_exercises` insert within a single flush batch (this schema uses
-plain UUID foreign keys, not JPA `@ManyToOne` associations, so Hibernate can't
-see the dependency) - fixed by leaving `order_inserts`/`order_updates` at
-their default (off); see the comment in `application.yml`. A second bug
-(`/actuator/health` 404-turned-500 because `spring-boot-starter-actuator` was
-referenced in config but never added as a dependency) was also caught this
-way.
+Against that real Postgres and Redis, the backend boots, all Flyway migrations
+apply, the seed data loads, and the auth -> dashboard -> workout-logging ->
+PR-detection -> messaging -> coach-notes path runs end to end.
 
-None of this local-verification tooling is part of the shipped application -
-`docker-compose.yml` is the real, supported way to run this project, and CI
-(`.github/workflows/ci.yml`) runs against real `postgres:16-alpine` and
-`redis:7-alpine` service containers.
+**This caught two real bugs that the unit tests could not:**
+
+1. **Foreign-key ordering.** Hibernate's `order_inserts` optimization batches
+   inserts by entity type, which reordered `workout_sets` ahead of the
+   `workout_exercises` rows they point at. This schema uses plain UUID foreign
+   keys rather than JPA `@ManyToOne` associations, so Hibernate cannot see the
+   dependency and cannot know the ordering matters. Fixed by leaving
+   `order_inserts`/`order_updates` at their defaults - see the comment in
+   `application.yml`, which explains why they must stay off.
+2. **A missing dependency.** `/actuator/health` returned 500 because
+   `spring-boot-starter-actuator` was referenced in configuration and in the
+   Docker healthcheck but had never been added to `pom.xml`. Compiles fine;
+   fails the moment anything actually calls it.
+
+Neither is the kind of bug a unit test with mocked collaborators would surface,
+which is the argument for doing this rather than trusting green tests.
+
+None of this local tooling ships with the application. `docker-compose.yml` is
+the supported way to run the project, and CI (`.github/workflows/ci.yml`) runs
+against real `postgres:16-alpine` and `redis:7-alpine` service containers.
 
 ## Seed data
 

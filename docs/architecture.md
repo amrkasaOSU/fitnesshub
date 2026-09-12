@@ -85,7 +85,9 @@ src/lib/                    api-client (fetch + CSRF handling), types (mirrors b
 Server state lives in TanStack Query; local component state is reserved for
 forms, the rest timer, and other purely-client concerns. Every fitness
 calculation (1RM, volume, adherence, PR detection) happens on the backend -
-the frontend only renders numbers it's given, per spec section 164.
+the frontend only renders numbers it's given. A client and their coach must
+never see different values for the same metric, which is only guaranteed if
+there is exactly one implementation of each formula.
 
 ## Infrastructure
 

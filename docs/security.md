@@ -82,7 +82,7 @@ changes. Subscription tier/status is **only** ever written from a verified
 webhook event or the checkout-session lookup it triggers - the frontend
 cannot set its own plan.
 
-## What's not implemented in this pass
+## Not implemented yet
 
 - Email verification and password-reset flows have the necessary schema
   fields (`User.emailVerified`) but no email-sending integration.

@@ -7,7 +7,7 @@ feature layered on top of real data, not the product itself. It never invents
 numbers - every answer is grounded in a structured context object built from
 the asking user's own logged history.
 
-## The pipeline (spec section 73)
+## The pipeline
 
 ```
 User question

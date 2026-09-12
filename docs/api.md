@@ -44,8 +44,7 @@ check Swagger for exact field-level shapes.
 | Export | `/api/export/{weight,steps,nutrition,workouts}.csv` | premium-gated for clients, always available to coaches |
 | Reports | `/api/clients/{id}/report.pdf` | coach-generated PDF progress report |
 
-This mirrors the endpoint list in the product spec section 105 closely but
-isn't identical everywhere a more RESTful shape made sense (e.g. workout
+The shape isn't uniform everywhere a more RESTful arrangement made sense (e.g. workout
 history/detail nest under `/api/clients/{id}/workouts` for coach views in
 addition to the client's own `/api/workouts`). Swagger UI is the definitive
 list.

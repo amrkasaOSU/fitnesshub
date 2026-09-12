@@ -34,3 +34,6 @@ npm-debug.log*
 # Testcontainers / misc
 .testcontainers.properties
 dump.rdb
+
+# Local editor/agent tooling
+.claude/

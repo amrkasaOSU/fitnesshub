@@ -1,0 +1,3 @@
+Keeps public/ in the repo. It's empty today, but frontend/Dockerfile copies it
+into the runtime image, and git won't track an empty directory - so without
+this file the Docker build fails on a fresh clone.

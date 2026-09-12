@@ -44,8 +44,8 @@ entities but never generates DDL itself.
 | WeightEntry | bodyweight | |
 | StepEntry | steps | Unique per (client, date) |
 | NutritionEntry | nutrition | Unique per (client, date) - see docs/fitness-calculations.md for why it's a daily total, not per-meal |
-| DailyActivity | nutrition | Schema present per spec; calorie estimates are computed on read rather than persisted here in this pass |
-| Goal | goal | **Named `Goal`, not `FitnessGoal`** - the spec's entity name collides with `client.FitnessGoal`, the enum of goal categories (FAT_LOSS, STRENGTH, ...). Renamed to avoid two same-named types in the codebase. |
+| DailyActivity | nutrition | Calorie estimates are computed on read rather than persisted here, so a change to the formula doesn't leave stale rows behind |
+| Goal | goal | **Named `Goal`, not `FitnessGoal`** - the obvious name collides with `client.FitnessGoal`, the enum of goal categories (FAT_LOSS, STRENGTH, ...). Renamed to avoid two same-named types in the codebase. |
 | CheckIn | goal | Weekly check-in; unique per (client, week start date) |
 | Conversation / Message | messaging | One conversation per (coach, client) pair |
 | Notification / NotificationPreference | notification | |

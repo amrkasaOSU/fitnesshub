@@ -43,17 +43,17 @@ updated in place when beaten rather than appended:
 | MAX_VOLUME | Highest total volume for that exercise in one session | On workout completion |
 
 "Valid" here means `isValidForOneRepMaxAndPr()` - warmups, failed sets, and
-zero-rep entries never count as a PR, matching spec section 28's instruction
-not to use failed/warmup sets for 1RM-derived numbers.
+zero-rep entries never count as a PR. A rep you failed isn't evidence of
+strength, and a warmup isn't a maximal effort, so neither belongs in a
+1RM-derived number.
 
 ## Weekly average body weight
 
 `WeightService#weeklyAverage` computes the arithmetic mean of entries within
 a **Monday-Sunday week**, in the client's own timezone. The dashboard
 (`WeightService#dashboard`) deliberately shows the **most recently completed**
-full week, not the current in-progress one - per spec section 36 ("If
-insufficient data exists: 'No complete weekly average yet.'"), a partial week
-isn't a meaningful average yet. If the prior completed week has zero entries,
+full week, not the current in-progress one: a partial week isn't a meaningful
+average yet, and showing one invites a client to read noise as a trend. If the prior completed week has zero entries,
 the dashboard returns `null` with that exact message rather than silently
 showing zero or the latest single reading.
 
@@ -144,8 +144,8 @@ to be reasonable defaults, not calibrated against real usage data.
   `unavailable` rather than guessed if the client hasn't set height, date of
   birth, sex, or logged a body weight yet.
 - **Estimated calorie balance** = calories consumed − estimated total
-  calories burned. Always labeled an estimate, never presented as exact,
-  per spec section 45.
+  calories burned. Always labeled an estimate, never presented as exact -
+  there's no wearable or heart-rate data behind it.
 
 ## Training summary (weekly/period analytics)
 
