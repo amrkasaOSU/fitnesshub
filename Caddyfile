@@ -1,0 +1,30 @@
+# Fronts the whole application on ONE origin, which is the point.
+#
+# The app and the API share a domain, so session cookies are same-origin by
+# construction: no SameSite problem, no CORS preflights, and no weakening
+# cookie settings to work around hosting on two unrelated domains.
+#
+# Caddy also obtains and renews a Let's Encrypt certificate automatically, so
+# HTTPS needs no manual certbot step. SITE_ADDRESS must be a real hostname
+# pointing at this server for that to work.
+{$SITE_ADDRESS} {
+	encode gzip
+
+	# Anything the backend owns.
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	# Health check, useful for uptime monitoring.
+	handle /actuator/health {
+		reverse_proxy backend:8080
+	}
+
+	# Everything else is the Next.js app.
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	# Progress photos are personal; keep them out of shared caches.
+	header /api/progress-photos/* Cache-Control "private, max-age=1800"
+}

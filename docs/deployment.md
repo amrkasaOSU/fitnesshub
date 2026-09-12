@@ -1,5 +1,9 @@
 # Deployment
 
+For a concrete, zero-cost walkthrough on an always-on VM, see
+[deployment-oracle.md](deployment-oracle.md). This document covers the rules
+that apply wherever you host.
+
 ## The one thing you must not forget
 
 Set **`SPRING_PROFILES_ACTIVE=prod`** on the backend.
