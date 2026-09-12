@@ -47,6 +47,7 @@ entities but never generates DDL itself.
 | DailyActivity | nutrition | Calorie estimates are computed on read rather than persisted here, so a change to the formula doesn't leave stale rows behind |
 | Goal | goal | **Named `Goal`, not `FitnessGoal`** - the obvious name collides with `client.FitnessGoal`, the enum of goal categories (FAT_LOSS, STRENGTH, ...). Renamed to avoid two same-named types in the codebase. |
 | CheckIn | goal | Weekly check-in; unique per (client, week start date) |
+| ProgressPhoto | photo | Transformation photos. Bytes live in a `bytea` column - see the comment in `V11__progress_photos.sql` for why, and what to change if it ever outgrows that. Listing projects metadata only so a gallery never loads image data |
 | Conversation / Message | messaging | One conversation per (coach, client) pair |
 | Notification / NotificationPreference | notification | |
 | Subscription | subscription | One row per user; `type` is COACH_PLAN or CLIENT_PLAN, `tier` is FREE/PRO/PREMIUM (PRO only valid with COACH_PLAN, PREMIUM only with CLIENT_PLAN - enforced in code, not the schema) |

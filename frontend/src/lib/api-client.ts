@@ -121,6 +121,38 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
   return json.data as T;
 }
 
+/**
+ * Multipart upload. Deliberately does NOT set Content-Type: the browser has to
+ * generate it so it can append the multipart boundary, and setting it by hand
+ * produces a body the server can't parse.
+ */
+export async function apiUpload<T>(path: string, form: FormData): Promise<T> {
+  await ensureCsrfCookie();
+  const headers: Record<string, string> = {};
+  const csrf = readCookie("XSRF-TOKEN");
+  if (csrf) headers["X-XSRF-TOKEN"] = csrf;
+
+  const response = await fetchOrThrow(`${API_URL}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers,
+    body: form,
+  });
+
+  const text = await response.text();
+  let json: ApiEnvelope;
+  try {
+    json = (text ? JSON.parse(text) : {}) as ApiEnvelope;
+  } catch {
+    throw new ApiError(response.status, "INVALID_RESPONSE", "The server returned an unexpected response.");
+  }
+  if (!response.ok) {
+    const err = json.error;
+    throw new ApiError(response.status, err?.code ?? "UNKNOWN", err?.message ?? "Upload failed.", err?.details ?? []);
+  }
+  return json.data as T;
+}
+
 export const api = {
   get: <T>(path: string, query?: RequestOptions["query"]) => apiFetch<T>(path, { method: "GET", query }),
   post: <T>(path: string, body?: unknown, query?: RequestOptions["query"]) =>

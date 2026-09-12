@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { ComingSoon } from "@/components/coming-soon";
+import { useFeatures } from "@/lib/use-features";
 
 const suggestions = [
   "Should I attempt a heavier bench press today?",
@@ -18,6 +20,7 @@ const suggestions = [
 ];
 
 export default function AiAssistantPage() {
+  const { aiEnabled } = useFeatures();
   const [question, setQuestion] = useState("");
   const [history, setHistory] = useState<{ question: string; answer: AiAnswer }[]>([]);
 
@@ -39,7 +42,14 @@ export default function AiAssistantPage() {
         </p>
       </div>
 
-      {history.length === 0 && (
+      {!aiEnabled && (
+        <ComingSoon
+          title="The AI assistant isn't switched on yet"
+          body="Once it's enabled it will answer questions using your real logged sets, weight, and nutrition - not generic advice. Everything else in the app works in the meantime."
+        />
+      )}
+
+      {aiEnabled && history.length === 0 && (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {suggestions.map((s) => (
             <Button key={s} variant="outline" className="h-auto justify-start whitespace-normal py-3 text-left" onClick={() => setQuestion(s)}>
@@ -87,17 +97,19 @@ export default function AiAssistantPage() {
         ))}
       </div>
 
-      <div className="flex gap-2">
-        <Textarea
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask a training question..."
-          className="min-h-12 resize-none"
-        />
-        <Button disabled={!question.trim() || ask.isPending} onClick={() => ask.mutate(question.trim())}>
-          {ask.isPending ? "Thinking..." : "Ask"}
-        </Button>
-      </div>
+      {aiEnabled && (
+        <div className="flex gap-2">
+          <Textarea
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            placeholder="Ask a training question..."
+            className="min-h-12 resize-none"
+          />
+          <Button disabled={!question.trim() || ask.isPending} onClick={() => ask.mutate(question.trim())}>
+            {ask.isPending ? "Thinking..." : "Ask"}
+          </Button>
+        </div>
+      )}
 
       <p className="text-center text-xs text-muted-foreground">
         FitnessHub&apos;s AI assistant provides general information based on your data, not medical

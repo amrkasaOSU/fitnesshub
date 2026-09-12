@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "@/components/stat-card";
+import { PhotoGallery } from "@/components/photo-gallery";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
@@ -95,6 +96,7 @@ export default function CoachClientDetailPage({ params }: { params: Promise<{ id
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="workouts">Workouts</TabsTrigger>
           <TabsTrigger value="goals">Goals</TabsTrigger>
+          <TabsTrigger value="photos">Photos</TabsTrigger>
           <TabsTrigger value="notes">Notes</TabsTrigger>
         </TabsList>
 
@@ -177,6 +179,10 @@ export default function CoachClientDetailPage({ params }: { params: Promise<{ id
               ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="photos">
+          <PhotoGallery clientId={id} />
         </TabsContent>
 
         <TabsContent value="notes" className="space-y-4">

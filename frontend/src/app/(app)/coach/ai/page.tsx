@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ComingSoon } from "@/components/coming-soon";
+import { useFeatures } from "@/lib/use-features";
 
 export default function CoachAiPage() {
   const [clientId, setClientId] = useState<string>("");
@@ -16,6 +18,8 @@ export default function CoachAiPage() {
     queryKey: ["coach", "clients"],
     queryFn: () => api.get<ClientSummaryDto[]>("/api/clients"),
   });
+
+  const { aiEnabled } = useFeatures();
 
   const analyze = useMutation({
     mutationFn: () => api.post<AiAnswer>("/api/ai/client-analysis", { clientId }),
@@ -31,7 +35,15 @@ export default function CoachAiPage() {
         </p>
       </div>
 
-      <div className="flex gap-2">
+      {!aiEnabled && (
+        <ComingSoon
+          title="AI client insights aren't switched on yet"
+          body="Once enabled, this will summarise a client's training, nutrition, and adherence into a short brief before your check-in. Attention flags on your dashboard already do this deterministically today."
+        />
+      )}
+
+      {aiEnabled && (
+        <div className="flex gap-2">
         <Select value={clientId} onValueChange={setClientId}>
           <SelectTrigger className="flex-1">
             <SelectValue placeholder="Select a client" />
@@ -44,12 +56,13 @@ export default function CoachAiPage() {
             ))}
           </SelectContent>
         </Select>
-        <Button disabled={!clientId || analyze.isPending} onClick={() => analyze.mutate()}>
-          {analyze.isPending ? "Analyzing..." : "Analyze"}
-        </Button>
-      </div>
+          <Button disabled={!clientId || analyze.isPending} onClick={() => analyze.mutate()}>
+            {analyze.isPending ? "Analyzing..." : "Analyze"}
+          </Button>
+        </div>
+      )}
 
-      {analyze.data && (
+      {aiEnabled && analyze.data && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-sm">

@@ -360,3 +360,13 @@ export interface ProgramSummaryDto {
   dayCount: number;
   assignedClientCount: number;
 }
+
+/** Metadata for a transformation photo; the bytes come from a separate endpoint. */
+export interface ProgressPhotoDto {
+  id: string;
+  takenOn: string;
+  caption?: string | null;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+}

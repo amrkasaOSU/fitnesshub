@@ -36,7 +36,9 @@ check Swagger for exact field-level shapes.
 | Coach | `/api/coach/clients`, `/api/coach/clients/{id}/notes`, `/api/coach/conversations` | client creation, private notes, conversation list |
 | Workouts | `/api/workouts*`, `/api/sets/{id}` | today's workout, the Mon-Sun week (`/week`), skipping with a reason (`/today/skip`), logging, completion, feedback |
 | Weight/Steps/Nutrition | `/api/weight*`, `/api/steps*`, `/api/nutrition*` | log + dashboard + history |
-| Goals/Check-ins | `/api/goals*`, `/api/checkins*` | |
+| Goals/Check-ins | `/api/goals*`, `/api/checkins*`, `/api/coach/checkins` | client submits a weekly check-in; coach reads the pending queue and replies |
+| Progress photos | `/api/progress-photos*` | upload/list/delete metadata, plus `/{id}/image` for the bytes. Session-authenticated - there is no public URL |
+| Feature flags | `/api/features` | which optional integrations (AI, billing) are configured, so the UI can show "coming soon" instead of a dead end |
 | Messaging/Notifications | `/api/messages*`, `/api/notifications*` | |
 | Analytics | `/api/analytics` | ad-hoc training summary for a date range |
 | AI | `/api/ai/fitness-question`, `/api/ai/client-analysis` | see [docs/ai.md](ai.md) |

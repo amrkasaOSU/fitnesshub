@@ -14,6 +14,8 @@ import {
   Sparkles,
   LogOut,
   CalendarDays,
+  ClipboardList,
+  Camera,
 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import { useCurrentUser, useLogout } from "@/lib/use-auth";
@@ -27,12 +29,16 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+// Order matters: the first five become the mobile tab bar, so the things a
+// client touches daily come first and the rest live in the sidebar.
 const clientNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/workout/today", label: "Today", icon: Dumbbell },
-  { href: "/workouts", label: "History", icon: CalendarDays },
+  { href: "/log", label: "Log", icon: ClipboardList },
   { href: "/progress", label: "Progress", icon: LineChart },
   { href: "/messages", label: "Messages", icon: MessageSquare },
+  { href: "/photos", label: "Photos", icon: Camera },
+  { href: "/workouts", label: "History", icon: CalendarDays },
   { href: "/ai", label: "AI Assistant", icon: Sparkles },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -40,6 +46,7 @@ const clientNav = [
 const coachNav = [
   { href: "/coach/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/coach/clients", label: "Clients", icon: Users },
+  { href: "/coach/checkins", label: "Check-ins", icon: ClipboardList },
   { href: "/coach/messages", label: "Messages", icon: MessageSquare },
   { href: "/coach/ai", label: "AI Insights", icon: Sparkles },
   { href: "/settings", label: "Settings", icon: Settings },

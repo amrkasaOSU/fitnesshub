@@ -44,7 +44,12 @@ export default function PricingPage() {
         Simple plans for coaches and clients. Cancel anytime.
       </p>
 
-      <h2 className="mt-12 text-xl font-semibold">For Coaches</h2>
+      
+        <div className="mx-auto mt-4 max-w-xl rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+          Paid plans are coming soon. Everything below is available today while
+          FitnessHub is in early access - nothing is behind a paywall yet.
+        </div>
+<h2 className="mt-12 text-xl font-semibold">For Coaches</h2>
       <div className="mt-4 grid gap-6 sm:grid-cols-2">
         {coachPlans.map((plan) => (
           <Card key={plan.name} className={plan.name === "Pro" ? "border-primary" : ""}>

@@ -79,6 +79,12 @@ The decisions I'd want to talk through, each linked to where it lives:
 - **Third-party outages are non-events.** OpenAI and Stripe sit behind
   interfaces that return typed "not configured" results instead of throwing.
   The app runs completely without either - [docs/ai.md](docs/ai.md).
+- **Progress photos are private by construction.** Body photos are the most
+  sensitive thing here, so the bytes are served only through a
+  session-authenticated endpoint - there is no shareable URL. A coach can view
+  a client's gallery but cannot upload to or delete from it, and listing a
+  gallery projects metadata only so image data is never loaded to render
+  thumbnails.
 - **Verified against real infrastructure, not mocks.** Standing the stack up on
   real PostgreSQL and Redis caught two bugs unit tests could not: Hibernate
   reordering inserts so child rows were written before their parents, and a
@@ -174,11 +180,12 @@ Stated plainly rather than buried:
   against real PostgreSQL and Redis - see
   [docs/development.md](docs/development.md#verifying-without-docker) - but
   that verification isn't automated.
-- **The AI assistant needs an `OPENAI_API_KEY`** (or any OpenAI-compatible
-  endpoint) to give real answers. Without one it returns a clear "not
-  configured" message and nothing else breaks.
-- **Stripe billing needs real test-mode keys** to exercise end to end. Same
-  graceful-degradation behaviour without them.
+- **AI and paid plans are switched off.** `GET /api/features` reports whether
+  each integration is configured, and the UI renders a "coming soon" state
+  instead of a dead end. Add an `OPENAI_API_KEY` (or any OpenAI-compatible
+  endpoint via `OPENAI_BASE_URL`) or Stripe test keys and the features turn
+  themselves on - no frontend change needed. Everything else works without
+  either.
 - **No email delivery.** Email verification and password reset have their
   schema fields but no sending integration.
 

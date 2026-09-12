@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useFeatures } from "@/lib/use-features";
 import { api } from "@/lib/api-client";
 import { useCurrentUser } from "@/lib/use-auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import type { User } from "@/lib/types";
 
 export default function SettingsPage() {
+  const { billingEnabled } = useFeatures();
   const { data: user } = useCurrentUser();
   const queryClient = useQueryClient();
   const firstNameRef = useRef<HTMLInputElement>(null);
@@ -68,8 +70,11 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Manage your subscription. Requires Stripe to be configured on the server.
+            {billingEnabled
+              ? "Manage your subscription."
+              : "Paid plans aren't switched on yet — everything in the app is available in the meantime."}
           </p>
+          {billingEnabled && (
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -94,6 +99,7 @@ export default function SettingsPage() {
               Manage billing
             </Button>
           </div>
+          )}
         </CardContent>
       </Card>
     </div>
