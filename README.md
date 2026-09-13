@@ -155,7 +155,8 @@ including how this was verified without Docker during initial development.
 - [docs/fitness-calculations.md](docs/fitness-calculations.md) - every formula (1RM, volume, adherence, calorie estimates, attention flags) and what it assumes
 - [docs/development.md](docs/development.md) - local dev, testing, seed data
 - [docs/deployment.md](docs/deployment.md) - running it for real: the production profile, required environment, and why both halves belong on one domain
-- [docs/deployment-oracle.md](docs/deployment-oracle.md) - a concrete zero-cost deployment on an always-on VM, single-origin behind Caddy
+- [docs/deployment-oracle.md](docs/deployment-oracle.md) - zero-cost deployment on an always-on VM, single-origin behind Caddy
+- [docs/deployment-render.md](docs/deployment-render.md) - zero-cost deployment across Vercel, Render, Neon and Upstash when no always-on host is available
 
 ## Testing
 

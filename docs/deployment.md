@@ -1,8 +1,9 @@
 # Deployment
 
-For a concrete, zero-cost walkthrough on an always-on VM, see
-[deployment-oracle.md](deployment-oracle.md). This document covers the rules
-that apply wherever you host.
+Two zero-cost walkthroughs exist: [deployment-oracle.md](deployment-oracle.md)
+(one always-on VM, no cold starts) and
+[deployment-render.md](deployment-render.md) (managed free tiers, but the
+backend sleeps). This document covers the rules that apply wherever you host.
 
 ## The one thing you must not forget
 

@@ -3,8 +3,11 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Emits .next/standalone: a self-contained server bundle with only the
   // node_modules actually reached at runtime. frontend/Dockerfile copies it,
-  // so without this the production image cannot be built at all.
-  output: "standalone",
+  // so without this the self-hosted production image cannot be built at all.
+  //
+  // Skipped on Vercel, which uses its own build output format and does not want
+  // a standalone server bundle.
+  output: process.env.VERCEL ? undefined : "standalone",
 
   /**
    * Optional same-origin proxy for the API.
