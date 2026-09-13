@@ -35,18 +35,47 @@ Optional: `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`, `STRIPE_SECRET_KE
 `STRIPE_WEBHOOK_SECRET`. Leave them unset and those features report themselves
 as unconfigured via `GET /api/features`; everything else works.
 
-## Put both halves on the same site
-
-Host the frontend and backend as subdomains of one domain -
-`app.example.com` and `api.example.com`.
+## The frontend and the API must share an origin
 
 Session cookies default to `SameSite=Lax`, which browsers do not send on
-cross-**site** requests. Different ports on one host are fine (`localhost:3000`
-to `localhost:8080` is same-site), and different subdomains of one domain are
-fine. Two unrelated domains - say `something.vercel.app` calling
-`something.onrender.com` - are cross-site, and every authenticated request
-fails, login included. Working around that means `SameSite=None`, which is
-strictly weaker. Using one domain avoids the problem instead of mitigating it.
+cross-**site** requests. If the frontend and backend sit on unrelated domains -
+a Vercel app calling a Render service, say - then *every* authenticated request
+fails, login included. The usual workaround is `SameSite=None`, which is
+strictly weaker. Don't do that; pick one of these instead.
+
+### Option A - one host, reverse proxy in front
+
+Both services on one machine behind Caddy, which routes `/api/*` to the backend
+and everything else to Next.js. This is what `docker-compose.prod.yml` does; see
+[deployment-oracle.md](deployment-oracle.md).
+
+    browser ──> Caddy ─┬─ /api/*  ──> backend
+                       └─ /*       ──> frontend
+
+### Option B - split hosts, Next proxies the API
+
+When the backend has to live somewhere else - a free tier that only runs one
+service, a platform without capacity - set **`BACKEND_ORIGIN`** on the frontend.
+Next then forwards `/api/*` to the backend *server-side*, so the browser still
+only ever talks to the frontend's own origin.
+
+    browser ──> Next (Vercel) ─┬─ /api/*  ──server-side──> backend (anywhere)
+                               └─ /*       ──> the app itself
+
+Set both of these on the frontend:
+
+| Variable | Value |
+|---|---|
+| `BACKEND_ORIGIN` | `https://your-backend.example.com` (server-side only, not public) |
+| `NEXT_PUBLIC_API_URL` | *empty* - makes the browser use relative URLs |
+
+The backend still needs `FRONTEND_URL` set to the frontend's origin. CORS won't
+actually be exercised, since the browser never makes a cross-origin call, but
+the value is also used elsewhere.
+
+The tradeoff is one extra hop: API calls go browser -> frontend host -> backend.
+For a handful of clients that is not noticeable, and it buys the freedom to host
+the backend anywhere at all.
 
 ## First deploy checklist
 

@@ -12,6 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
+// Empty string means "same origin" - used when Next proxies /api/* to the
+// backend (see BACKEND_ORIGIN in next.config.ts). Unset falls back to the
+// local backend for development.
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 function todayLocal() {
