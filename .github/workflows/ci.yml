@@ -2,34 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   backend:
-    name: Backend (Java)
+    name: Backend (unit + integration tests)
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: fitnesshub
-          POSTGRES_USER: fitnesshub
-          POSTGRES_PASSWORD: fitnesshub_dev_password
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U fitnesshub"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports: ["6379:6379"]
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -38,20 +18,42 @@ jobs:
           java-version: "21"
           cache: maven
           cache-dependency-path: backend/pom.xml
-      - name: Compile
-        working-directory: backend
-        run: ./mvnw -B -q compile
+
+      # `verify` runs the unit tests (surefire) and then the *IT integration
+      # tests (failsafe). The integration tests start their own PostgreSQL and
+      # Redis with Testcontainers, using the runner's Docker daemon, so this job
+      # needs no service containers.
       - name: Test
         working-directory: backend
-        env:
-          DATABASE_URL: jdbc:postgresql://localhost:5432/fitnesshub
-          POSTGRES_USER: fitnesshub
-          POSTGRES_PASSWORD: fitnesshub_dev_password
-          REDIS_URL: redis://localhost:6379
-        run: ./mvnw -B test
-      - name: Package
-        working-directory: backend
-        run: ./mvnw -B -q package -DskipTests
+        run: ./mvnw -B verify
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          {
+            echo "### Backend coverage (JaCoCo, unit + integration)"
+            echo '```'
+            python3 scripts/coverage-summary.py backend/target/site/jacoco/jacoco.csv
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: jacoco-report
+          path: backend/target/site/jacoco/
+          retention-days: 14
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports
+          path: |
+            backend/target/surefire-reports/
+            backend/target/failsafe-reports/
+          retention-days: 14
 
   frontend:
     name: Frontend (Next.js)
@@ -76,6 +78,47 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8080
         run: npm run build
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # The real stack from source: production Next.js build, Spring Boot,
+      # PostgreSQL and Redis. The backend seeds the demo accounts on first boot.
+      - name: Start the stack
+        run: docker compose -f loadtest/docker-compose.loadtest.yml --profile ui up -d --build --wait
+
+      - name: Install Playwright
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        working-directory: frontend
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          retention-days: 14
+
+      - name: Backend logs on failure
+        if: failure()
+        run: docker compose -f loadtest/docker-compose.loadtest.yml logs backend | tail -200
 
   docker:
     name: Docker build

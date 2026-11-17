@@ -33,7 +33,9 @@ export default function LoginPage() {
           <Link href="/" className="mx-auto flex items-center gap-2 font-bold">
             <Dumbbell className="h-5 w-5 text-primary" /> FitnessHub
           </Link>
-          <CardTitle className="mt-4">Log in</CardTitle>
+          <CardTitle className="mt-4">
+            <h1>Log in</h1>
+          </CardTitle>
           <CardDescription>Welcome back. Let&apos;s get to work.</CardDescription>
         </CardHeader>
         <CardContent>

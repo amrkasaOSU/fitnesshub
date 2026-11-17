@@ -221,3 +221,64 @@ Public pages are already near-perfect. Every signed-in page loses
 accessibility points to the same two audits (`color-contrast`, and
 `link-name` - the notification bell is an icon-only link with no accessible
 name), and `/progress` also has an icon-only button with no name.
+
+## 2. Integration and end-to-end tests
+
+### 2.1 What was added
+
+| Suite | Tests | What it runs against |
+|---|---:|---|
+| `AuthFlowIT` | 19 | Registration, login, session cookie, logout, CSRF, role gates, password change, failed-login lockout, session-id rotation |
+| `OwnershipIT` | 37 | Cross-tenant access: every client-data endpoint attacked by a signed-out visitor, another client of the same coach, an unrelated coach, and that coach's client |
+| `FitnessCalculationsIT` | 20 | Known-answer tests, worked out by hand: Epley 1RM, volume rules, PR eligibility, adherence, weekly weight average, Mifflin-St Jeor calories |
+| `WorkoutLifecycleIT` | 5 | Today's workout from "opened the app" to "finished", and what the coach sees at each stage |
+| Playwright E2E | 12 | Core flows in a real browser: sign-in/out, coach adds a client then builds and assigns a program, client logs sets and finishes a workout, client logs weight and steps, empty states, phone layout |
+
+The integration tests boot the whole Spring application against real
+PostgreSQL 16 and Redis 7 containers (Testcontainers) and talk to it over HTTP
+with real session cookies and the CSRF double-submit, exactly as the browser
+does. Nothing is mocked. The E2E tests drive the **production build** of the
+frontend against the real backend.
+
+Both run in GitHub Actions on every push
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): `backend` runs
+`./mvnw verify` (unit + integration) and publishes the coverage report, and a
+new `e2e` job starts the full stack with docker compose and runs Playwright.
+
+### 2.2 Coverage
+
+```bash
+cd backend && ./mvnw -B verify      # needs Docker (Testcontainers)
+python3 scripts/coverage-summary.py backend/target/site/jacoco/jacoco.csv
+```
+
+| Metric | Before | After | Change |
+|---|---:|---:|---:|
+| Tests | 20 | 101 (20 unit + 81 integration) | +81 |
+| Line coverage | 155 / 3,770 = 4.1% | 2,948 / 3,782 = **77.9%** | +73.8 points |
+| Branch coverage | 46 / 900 = 5.1% | 505 / 902 = **56.0%** | +50.9 points |
+| Instruction coverage | 3.7% | 79.4% | +75.7 points |
+| Method coverage | 4.2% | 75.0% | +70.8 points |
+
+```bash
+docker compose -f loadtest/docker-compose.loadtest.yml --profile ui up -d --build
+cd frontend && npx playwright test --repeat-each=3
+```
+
+E2E: **36 / 36 passed** (12 tests x 3 repeats, run to check for flakiness).
+
+### 2.3 Bugs the new tests found
+
+The integration tests were run against the **unchanged** code before any fix,
+so each of these was a real, pre-existing bug (74 tests at that point: 70
+passed, 4 failed; the extra tests below were then written to pin each bug):
+
+| # | Bug | How it showed up | Fix |
+|---|---|---|---|
+| 1 | **Session fixation.** Login kept the pre-login session id. An anonymous request opens a session, so an id planted in a victim's browser became a signed-in session. | `signingInIssuesAFreshSessionIdSoAPlantedOneIsWorthless`; reproduced with curl: identical `SESSION` before and after login | Invalidate any pre-login session before establishing the new one |
+| 2 | `/api/clients/{id}/progress`, `/nutrition` and `/checkins` returned **200 with the caller's own data** when a client put someone else's id in the path. Not a data leak, but the response claimed to be about a different person. | 3 failing `OwnershipIT` cases | Check access to the path id explicitly, returning 403 |
+| 3 | **Opening the app marked today's workout `IN_PROGRESS`**, so the coach dashboard's "training today" counted every client who merely looked at their plan. | `todayResolvesToDayOneOfTheCycle`, `merelyOpeningTheAppIsNotTraining` | An auto-created session starts `NOT_STARTED`; the first logged set promotes it |
+| 4 | The client dashboard created today's session inside a **read-only transaction**, so the insert never flushed and the dashboard returned a workout id that did not exist. | `theDashboardsWorkoutIsARealSessionTheClientCanOpen`; reproduced with curl: `GET` on the id returned 404, 0 rows in the DB | Make that method read-write |
+| 5 | An unknown timezone was accepted and silently treated as UTC everywhere. | `anUnknownTimezoneIsRejectedInsteadOfSilentlyBecomingUtc` | Validate with `ZoneId.of`, return 400 |
+| 6 | **The coach's roster didn't show a newly added client** if the roster was still loading when the client was created: TanStack Query reuses an in-flight first load on invalidation instead of refetching. | Playwright coach flow; the trace showed the roster `GET` (2,358 ms) started before the `POST` and finished after it | Cancel the in-flight query before invalidating |
+| 7 | The login and register pages had **no heading** (the title was a styled `div`). | Playwright `getByRole("heading", { name: "Log in" })` | Render the title as an `h1` |
