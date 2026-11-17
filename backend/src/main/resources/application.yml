@@ -50,7 +50,10 @@ spring:
       max-request-size: 10MB
 
 server:
-  port: ${SERVER_PORT:8080}
+  # PORT first: Render, Heroku, Fly and Cloud Run all inject it and expect the
+  # process to bind whatever they assigned. SERVER_PORT stays supported for
+  # docker-compose and local runs, which set it explicitly.
+  port: ${PORT:${SERVER_PORT:8080}}
   error:
     include-message: never
     include-stacktrace: never
