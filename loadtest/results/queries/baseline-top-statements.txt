@@ -1,0 +1,19 @@
+ calls | total_ms | mean_ms | pct  |                                                                         query                                                                          
+-------+----------+---------+------+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ 20003 |    254.4 |   0.013 | 16.6 | select we1_0.id,we1_0.created_at,we1_0.exercise_id,we1_0.notes,we1_0.order_index,we1_0.updated_at,we1_0.workout_session_id from workout_exercises we1_
+ 36268 |    248.2 |   0.007 | 16.2 | select ws1_0.id,ws1_0.completed_at,ws1_0.created_at,ws1_0.is_failure,ws1_0.reps,ws1_0.rir,ws1_0.rpe,ws1_0.set_number,ws1_0.updated_at,ws1_0.is_warmup,
+ 17295 |    165.3 |   0.010 | 10.8 | select pe1_0.id,pe1_0.created_at,pe1_0.exercise_id,pe1_0.notes,pe1_0.order_index,pe1_0.program_day_id,pe1_0.progression_strategy,pe1_0.rest_seconds,pe
+  4118 |     93.7 |   0.023 |  6.1 | select ws1_0.id,ws1_0.completed_at,ws1_0.created_at,ws1_0.is_failure,ws1_0.reps,ws1_0.rir,ws1_0.rpe,ws1_0.set_number,ws1_0.updated_at,ws1_0.is_warmup,
+  9424 |     84.4 |   0.009 |  5.5 | select cp1_0.id,cp1_0.activity_level,cp1_0.coach_id,cp1_0.created_at,cp1_0.daily_calorie_target,cp1_0.daily_protein_target,cp1_0.daily_step_target,cp1
+  4845 |     53.5 |   0.011 |  3.5 | select we1_0.id,we1_0.client_id,we1_0.created_at,we1_0.notes,we1_0.recorded_at,we1_0.updated_at,we1_0.weight from weight_entries we1_0 where we1_0.cli
+  4940 |     52.1 |   0.011 |  3.4 | select pd1_0.id,pd1_0.created_at,pd1_0.day_number,pd1_0.description,pd1_0.name,pd1_0.program_id,pd1_0.updated_at from program_days pd1_0 where pd1_0.p
+  4841 |     52.1 |   0.011 |  3.4 | select pd1_0.id,pd1_0.created_at,pd1_0.day_number,pd1_0.description,pd1_0.name,pd1_0.program_id,pd1_0.updated_at from program_days pd1_0 where pd1_0.i
+  4020 |     50.7 |   0.013 |  3.3 | select we1_0.id,we1_0.created_at,we1_0.exercise_id,we1_0.notes,we1_0.order_index,we1_0.updated_at,we1_0.workout_session_id from workout_exercises we1_
+  3630 |     48.0 |   0.013 |  3.1 | select ws1_0.id,ws1_0.client_id,ws1_0.completed_at,ws1_0.created_at,ws1_0.duration_seconds,ws1_0.energy_level,ws1_0.notes,ws1_0.overall_rpe,ws1_0.prog
+  4560 |     45.0 |   0.010 |  2.9 | select se1_0.id,se1_0.client_id,se1_0.created_at,se1_0.date,se1_0.source,se1_0.steps,se1_0.updated_at from step_entries se1_0 where se1_0.client_id=$1
+  4118 |     42.0 |   0.010 |  2.7 | select pr1_0.id,pr1_0.achieved_at,pr1_0.client_id,pr1_0.created_at,pr1_0.exercise_id,pr1_0.record_type,pr1_0.updated_at,pr1_0.value,pr1_0.workout_set_
+   950 |     32.5 |   0.034 |  2.1 | select pr1_0.id,pr1_0.achieved_at,pr1_0.client_id,pr1_0.created_at,pr1_0.exercise_id,pr1_0.record_type,pr1_0.updated_at,pr1_0.value,pr1_0.workout_set_
+  4940 |     29.2 |   0.006 |  1.9 | select cp1_0.id,cp1_0.client_id,cp1_0.created_at,cp1_0.end_date,cp1_0.program_id,cp1_0.start_date,cp1_0.status,cp1_0.updated_at from client_programs c
+  2945 |     28.7 |   0.010 |  1.9 | select ne1_0.id,ne1_0.calories,ne1_0.carbohydrates_grams,ne1_0.client_id,ne1_0.created_at,ne1_0.date,ne1_0.fat_grams,ne1_0.fiber_grams,ne1_0.notes,ne1
+(15 rows)
+

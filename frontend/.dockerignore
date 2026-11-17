@@ -1,0 +1,11 @@
+# Keep the host's build output and dependencies out of the image. Without
+# this, `COPY . .` overwrites the Linux node_modules installed in the deps
+# stage with whatever the host has (macOS native binaries, on a Mac).
+node_modules
+.next
+out
+.env*.local
+npm-debug.log*
+e2e
+playwright-report
+test-results

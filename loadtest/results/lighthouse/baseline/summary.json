@@ -1,0 +1,114 @@
+[
+  {
+    "page": "landing",
+    "path": "/",
+    "performance": 99,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 2262,
+    "tbtMs": 18,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "login",
+    "path": "/login",
+    "performance": 97,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 2621,
+    "tbtMs": 8,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "pricing",
+    "path": "/pricing",
+    "performance": 98,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 2482,
+    "tbtMs": 11,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "client-dashboard",
+    "path": "/dashboard",
+    "performance": 91,
+    "accessibility": 91,
+    "bestPractices": 93,
+    "seo": 100,
+    "lcpMs": 3423,
+    "tbtMs": 9,
+    "cls": 0,
+    "failedA11y": [
+      "color-contrast",
+      "link-name"
+    ]
+  },
+  {
+    "page": "workout-today",
+    "path": "/workout/today",
+    "performance": 90,
+    "accessibility": 91,
+    "bestPractices": 93,
+    "seo": 100,
+    "lcpMs": 3581,
+    "tbtMs": 7,
+    "cls": 0,
+    "failedA11y": [
+      "color-contrast",
+      "link-name"
+    ]
+  },
+  {
+    "page": "progress",
+    "path": "/progress",
+    "performance": 87,
+    "accessibility": 84,
+    "bestPractices": 96,
+    "seo": 100,
+    "lcpMs": 4030,
+    "tbtMs": 24,
+    "cls": 0,
+    "failedA11y": [
+      "button-name",
+      "color-contrast",
+      "link-name"
+    ]
+  },
+  {
+    "page": "coach-dashboard",
+    "path": "/coach/dashboard",
+    "performance": 90,
+    "accessibility": 91,
+    "bestPractices": 93,
+    "seo": 100,
+    "lcpMs": 3551,
+    "tbtMs": 56,
+    "cls": 0,
+    "failedA11y": [
+      "color-contrast",
+      "link-name"
+    ]
+  },
+  {
+    "page": "coach-clients",
+    "path": "/coach/clients",
+    "performance": 85,
+    "accessibility": 91,
+    "bestPractices": 96,
+    "seo": 100,
+    "lcpMs": 4421,
+    "tbtMs": 12,
+    "cls": 0,
+    "failedA11y": [
+      "color-contrast",
+      "link-name"
+    ]
+  }
+]

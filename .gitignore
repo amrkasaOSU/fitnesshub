@@ -37,3 +37,9 @@ dump.rdb
 
 # Local editor/agent tooling
 .claude/
+
+# Load-test scratch: raw Lighthouse reports and API response snapshots are
+# large and regenerable; the summaries next to them are what RESULTS.md cites.
+loadtest/results/lighthouse/*/*-[0-9].json
+loadtest/results/snapshots/
+loadtest/results/*.log
