@@ -15,6 +15,7 @@ import com.fitnesshub.goal.dto.CheckInDto;
 import com.fitnesshub.nutrition.NutritionEntry;
 import com.fitnesshub.nutrition.NutritionService;
 import com.fitnesshub.nutrition.dto.NutritionEntryDto;
+import com.fitnesshub.security.AuthorizationService;
 import com.fitnesshub.security.CurrentUser;
 import com.fitnesshub.workout.WorkoutService;
 import com.fitnesshub.workout.WorkoutSession;
@@ -47,11 +48,12 @@ public class ClientController {
     private final NutritionService nutritionService;
     private final CheckInService checkInService;
     private final CurrentUser currentUser;
+    private final AuthorizationService authorizationService;
 
     public ClientController(CoachClientService coachClientService, ClientProfileService clientProfileService,
                              AnalyticsService analyticsService, WorkoutService workoutService,
                              NutritionService nutritionService, CheckInService checkInService,
-                             CurrentUser currentUser) {
+                             CurrentUser currentUser, AuthorizationService authorizationService) {
         this.coachClientService = coachClientService;
         this.clientProfileService = clientProfileService;
         this.analyticsService = analyticsService;
@@ -59,6 +61,7 @@ public class ClientController {
         this.nutritionService = nutritionService;
         this.checkInService = checkInService;
         this.currentUser = currentUser;
+        this.authorizationService = authorizationService;
     }
 
     @GetMapping
@@ -83,6 +86,9 @@ public class ClientController {
     public ApiResponse<TrainingSummaryDto> progress(@PathVariable UUID id,
                                                       @RequestParam(required = false) LocalDate from,
                                                       @RequestParam(required = false) LocalDate to) {
+        // The id in the path names whose data this is, so a caller who may not
+        // see that client is refused - not quietly handed their own data instead.
+        authorizationService.assertCanAccessClient(id);
         LocalDate resolvedTo = to == null ? LocalDate.now() : to;
         LocalDate resolvedFrom = from == null ? resolvedTo.minusDays(29) : from;
         return ApiResponse.of(analyticsService.trainingSummary(id, resolvedFrom, resolvedTo));
@@ -103,6 +109,7 @@ public class ClientController {
             @PathVariable UUID id,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
+        authorizationService.assertCanAccessClient(id);
         Page<NutritionEntry> result = nutritionService.history(id,
                 PageRequest.of(page, Math.min(pageSize, 100), Sort.by(Sort.Direction.DESC, "date")));
         return ApiResponse.of(PageResponse.from(result.map(e -> new NutritionEntryDto(e.getId(), e.getDate(),
@@ -115,6 +122,7 @@ public class ClientController {
             @PathVariable UUID id,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
+        authorizationService.assertCanAccessClient(id);
         Page<CheckIn> result = checkInService.history(id,
                 PageRequest.of(page, Math.min(pageSize, 100), Sort.by(Sort.Direction.DESC, "weekStartDate")));
         return ApiResponse.of(PageResponse.from(result.map(checkInService::toDto)));

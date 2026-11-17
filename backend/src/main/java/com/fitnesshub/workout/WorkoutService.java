@@ -207,6 +207,12 @@ public class WorkoutService {
 
         ProgramDay programDay = resolveTodayProgramDay(clientId, clientTimezone).orElse(null);
         WorkoutSession session = new WorkoutSession(clientId, programDay == null ? null : programDay.getId());
+        // This runs whenever the client merely looks at today's plan, so it must
+        // not look like training: the constructor's IN_PROGRESS is right for an
+        // explicitly started workout, not for this. logSet() promotes it to
+        // IN_PROGRESS on the first set, which is what the coach's "training
+        // today" count relies on.
+        session.setStatus(WorkoutSessionStatus.NOT_STARTED);
         return sessionRepository.save(session);
     }
 

@@ -43,6 +43,14 @@ public class UserService {
             user.setLastName(request.lastName());
         }
         if (request.timezone() != null) {
+            // "Today", the weekly schedule and every daily total are computed in
+            // this zone, so an unparseable value must be rejected here rather
+            // than silently falling back to UTC later.
+            try {
+                java.time.ZoneId.of(request.timezone());
+            } catch (java.time.DateTimeException e) {
+                throw new IllegalArgumentException("Unknown timezone: " + request.timezone());
+            }
             user.setTimezone(request.timezone());
         }
         if (request.profileImageUrl() != null) {

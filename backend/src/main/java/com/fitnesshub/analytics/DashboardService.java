@@ -84,7 +84,13 @@ public class DashboardService {
         this.clientProfileRepository = clientProfileRepository;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Not read-only: the first dashboard load of the day creates today's
+     * workout session, exactly as {@code GET /api/workouts/today} does. Under
+     * a read-only transaction that insert was silently never flushed, so the
+     * dashboard handed back a session id that did not exist.
+     */
+    @Transactional
     public ClientDashboardDto clientDashboard() {
         UUID clientId = currentUser.id();
         User user = userRepository.findById(clientId).orElseThrow();

@@ -13,6 +13,7 @@ import com.fitnesshub.user.UserRepository;
 import com.fitnesshub.user.dto.UserDto;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -112,6 +113,15 @@ public class AuthController {
             throw e;
         }
         loginRateLimiter.recordSuccess(email, ip);
+
+        // Never promote a session that existed before the password was checked.
+        // Re-using it would let anyone who planted a session id in this browser
+        // inherit the login (session fixation), and would carry one account's
+        // session into the next when two people share a device.
+        HttpSession preLogin = httpRequest.getSession(false);
+        if (preLogin != null) {
+            preLogin.invalidate();
+        }
 
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(authentication);
