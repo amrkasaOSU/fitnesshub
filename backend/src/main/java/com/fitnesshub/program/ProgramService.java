@@ -6,6 +6,7 @@ import com.fitnesshub.common.exception.ConflictException;
 import com.fitnesshub.common.exception.ForbiddenException;
 import com.fitnesshub.common.exception.NotFoundException;
 import com.fitnesshub.exercise.Exercise;
+import com.fitnesshub.exercise.ExerciseCatalog;
 import com.fitnesshub.exercise.ExerciseRepository;
 import com.fitnesshub.program.dto.AssignProgramRequest;
 import com.fitnesshub.program.dto.ProgramDayDto;
@@ -37,6 +38,7 @@ public class ProgramService {
     private final ProgramExerciseRepository programExerciseRepository;
     private final ClientProgramRepository clientProgramRepository;
     private final ExerciseRepository exerciseRepository;
+    private final ExerciseCatalog exerciseCatalog;
     private final CurrentUser currentUser;
     private final AuthorizationService authorizationService;
     private final AuditService auditService;
@@ -46,6 +48,7 @@ public class ProgramService {
                            ProgramExerciseRepository programExerciseRepository,
                            ClientProgramRepository clientProgramRepository,
                            ExerciseRepository exerciseRepository,
+                           ExerciseCatalog exerciseCatalog,
                            CurrentUser currentUser,
                            AuthorizationService authorizationService,
                            AuditService auditService) {
@@ -54,6 +57,7 @@ public class ProgramService {
         this.programExerciseRepository = programExerciseRepository;
         this.clientProgramRepository = clientProgramRepository;
         this.exerciseRepository = exerciseRepository;
+        this.exerciseCatalog = exerciseCatalog;
         this.currentUser = currentUser;
         this.authorizationService = authorizationService;
         this.auditService = auditService;
@@ -104,9 +108,7 @@ public class ProgramService {
                 ? List.of()
                 : programExerciseRepository.findByProgramDayIdInOrderByOrderIndexAsc(dayIds);
 
-        Map<UUID, String> exerciseNames = exerciseRepository.findAllById(
-                        allExercises.stream().map(ProgramExercise::getExerciseId).distinct().toList())
-                .stream().collect(Collectors.toMap(Exercise::getId, Exercise::getName));
+        Map<UUID, String> exerciseNames = exerciseCatalog.namesById();
 
         Map<UUID, List<ProgramExercise>> byDay = allExercises.stream()
                 .collect(Collectors.groupingBy(ProgramExercise::getProgramDayId));
@@ -125,6 +127,27 @@ public class ProgramService {
 
         return new ProgramDto(program.getId(), program.getCoachId(), program.getName(), program.getDescription(),
                 program.getDurationWeeks(), program.getGoal(), program.getVersion(), dayDtos);
+    }
+
+    /** Summaries for a page of programs in two aggregate queries, rather than two queries per program. */
+    @Transactional(readOnly = true)
+    public Map<UUID, ProgramSummaryDto> toSummaryDtos(List<Program> programs) {
+        if (programs.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> ids = programs.stream().map(Program::getId).toList();
+        Map<UUID, Long> dayCounts = programDayRepository.countDaysPerProgram(ids).stream()
+                .collect(Collectors.toMap(r -> (UUID) r[0], r -> (Long) r[1]));
+        Map<UUID, Long> assignmentCounts = clientProgramRepository.countAssignmentsPerProgram(ids).stream()
+                .collect(Collectors.toMap(r -> (UUID) r[0], r -> (Long) r[1]));
+        Map<UUID, ProgramSummaryDto> summaries = new java.util.HashMap<>();
+        for (Program p : programs) {
+            summaries.put(p.getId(), new ProgramSummaryDto(p.getId(), p.getName(), p.getDurationWeeks(),
+                    p.getGoal(), p.getVersion(),
+                    dayCounts.getOrDefault(p.getId(), 0L).intValue(),
+                    assignmentCounts.getOrDefault(p.getId(), 0L).intValue()));
+        }
+        return summaries;
     }
 
     public ProgramSummaryDto toSummaryDto(Program program) {

@@ -17,14 +17,7 @@ compose() { docker compose -f "$HERE/docker-compose.loadtest.yml" "$@"; }
 OUT="$HERE/results/$LABEL"
 mkdir -p "$OUT"
 
-wait_healthy() {
-  for _ in $(seq 1 90); do
-    if curl -fsS http://localhost:18080/actuator/health >/dev/null 2>&1; then return 0; fi
-    sleep 2
-  done
-  echo "backend never became healthy" >&2
-  exit 1
-}
+wait_healthy() { "$HERE/wait-ready.sh" >/dev/null; }
 
 for VUS in $LEVELS; do
   echo "=== $LABEL: $VUS VUs for $DURATION ==="

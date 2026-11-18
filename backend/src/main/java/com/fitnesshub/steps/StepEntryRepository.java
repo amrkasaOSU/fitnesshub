@@ -15,4 +15,6 @@ public interface StepEntryRepository extends JpaRepository<StepEntry, UUID> {
     Page<StepEntry> findByClientIdOrderByDateDesc(UUID clientId, Pageable pageable);
 
     List<StepEntry> findByClientIdAndDateBetweenOrderByDateAsc(UUID clientId, LocalDate from, LocalDate to);
+
+    List<StepEntry> findByClientIdInAndDateBetweenOrderByDateAsc(List<UUID> clientIds, LocalDate from, LocalDate to);
 }

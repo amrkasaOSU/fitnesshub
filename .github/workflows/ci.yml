@@ -94,7 +94,9 @@ jobs:
       # The real stack from source: production Next.js build, Spring Boot,
       # PostgreSQL and Redis. The backend seeds the demo accounts on first boot.
       - name: Start the stack
-        run: docker compose -f loadtest/docker-compose.loadtest.yml --profile ui up -d --build --wait
+        run: |
+          docker compose -f loadtest/docker-compose.loadtest.yml --profile ui up -d --build --wait
+          loadtest/wait-ready.sh
 
       - name: Install Playwright
         working-directory: frontend

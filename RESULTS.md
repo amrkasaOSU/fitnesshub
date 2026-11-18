@@ -282,3 +282,146 @@ passed, 4 failed; the extra tests below were then written to pin each bug):
 | 5 | An unknown timezone was accepted and silently treated as UTC everywhere. | `anUnknownTimezoneIsRejectedInsteadOfSilentlyBecomingUtc` | Validate with `ZoneId.of`, return 400 |
 | 6 | **The coach's roster didn't show a newly added client** if the roster was still loading when the client was created: TanStack Query reuses an in-flight first load on invalidation instead of refetching. | Playwright coach flow; the trace showed the roster `GET` (2,358 ms) started before the `POST` and finished after it | Cancel the in-flight query before invalidating |
 | 7 | The login and register pages had **no heading** (the title was a styled `div`). | Playwright `getByRole("heading", { name: "Log in" })` | Render the title as an `h1` |
+
+## 3. Performance: N+1 queries, indexes, caching
+
+### 3.1 What changed
+
+- **Coach roster and dashboard** - the worst N+1. Each client used to cost
+  dozens of queries (weight, steps, nutrition, adherence, attention flags),
+  and the attention flags added further queries per workout session and per
+  exercise. A new `ClientSnapshotLoader` loads everything for the whole roster
+  with one `client_id IN (...)` query per table; the flag rules became a pure
+  function over that snapshot. The remaining dashboard figures are single
+  aggregate queries.
+- **Workout history** - 4 queries per row became 5 queries per page.
+- **Week strip, "previous performance", coach inbox, program list** - per-day,
+  per-exercise, per-conversation and per-program query loops replaced with
+  batch queries. "Previous performance" is now a `LATERAL ... LIMIT 1` query
+  that walks the client's sessions newest-first and stops at the first match.
+- **Indexes** ([`V13__composite_and_partial_indexes.sql`](backend/src/main/resources/db/migration/V13__composite_and_partial_indexes.sql)) -
+  composite `(owner, date DESC)` indexes for "this client's rows, newest
+  first", and partial indexes for "unread" lookups. Single-column indexes made
+  redundant by a composite were dropped.
+- **Redis cache for the exercise library** - see 3.5 for whether it helped.
+
+### 3.2 Proof that responses did not change
+
+```bash
+loadtest/snapshot.sh pre-perf          # old build, running
+# rebuild + restart the backend with the new code, same database
+loadtest/snapshot.sh after-indexes
+loadtest/compare-snapshots.py loadtest/results/snapshots/pre-perf loadtest/results/snapshots/after-indexes
+```
+
+37 responses compared - every optimised endpoint for the coach, all five
+seeded clients, and the 200-client scale coach (dashboard, roster with every
+attention flag, inbox):
+
+```
+compared 37 responses
+recent-PR lists differing only in the order of same-instant ties: 5
+RESULT: equivalent
+```
+
+The 5 differences are "recent personal records" lists in which several
+records share one timestamp (one logged set can set a weight, rep and 1RM
+record at once). The old code left the order of ties to whatever PostgreSQL
+returned; the new query breaks ties by id, so the order is now stable. The
+comparison script checks that everything above the cut-off is identical and
+that the timestamp sequence matches exactly. All 101 tests also pass on the
+new code.
+
+### 3.3 SQL statements per request and latency at scale (200 clients, 1 year each)
+
+```bash
+loadtest/psql.sh -v clients=200 -v days=365 < loadtest/scale-seed.sql
+N=7  loadtest/scale-measure.sh    # before; after N+1 fix; after indexes
+N=31 loadtest/scale-measure.sh    # after indexes, more samples
+```
+
+| Endpoint | SQL statements: before -> after | DB ms: before -> after | Median response ms: before -> after (N=31) | Change |
+|---|---|---|---|---:|
+| Coach dashboard | 67,801 -> **18** | 604.0 -> 180.2 | 5,278 -> **239** | **-95.5%** |
+| Coach client roster | 67,195 -> **15** | 584.2 -> 178.4 | 5,389 -> **234** | **-95.7%** |
+| Coach conversations | 601 -> 4 | 10.3 -> 5.0 | 58 -> 11 | -81.0% |
+| Coach unread badge | 1 -> 1 | 1.1 -> 0.0 | 3 -> 3 | 0% |
+| Client dashboard | 60 -> 29 | 1.8 -> 0.9 | 11 -> 11 | 0% |
+| Client today's workout | 31 -> 7 | 0.7 -> 0.2 | 7 -> 5 | -28.6% |
+| Client week strip | 35 -> 5 | 0.3 -> 0.1 | 6 -> 4 | -33.3% |
+| Client workout history | 80 -> 6 | 2.1 -> 0.4 | 14 -> 5 | -64.3% |
+| Client weight dashboard | 3 -> 3 | 0.4 -> 0.3 | 3 -> 4 | +33% (1 ms) |
+
+"Before" is the original code (N=7). Raw tables:
+[`baseline.md`](loadtest/results/scale/baseline.md),
+[`after-nplus1.md`](loadtest/results/scale/after-nplus1.md),
+[`after-indexes.md`](loadtest/results/scale/after-indexes.md),
+[`after-indexes-n31.md`](loadtest/results/scale/after-indexes-n31.md).
+
+**A regression I introduced and then fixed.** The first version of the
+"previous performance" batch query (one `DISTINCT ON` over the client's whole
+history) made the client dashboard *slower* for a client with a year of data:
+11 -> 28 ms median, because it scanned and sorted every session where the old
+code stopped after 20. `EXPLAIN ANALYZE` showed a parallel sequential scan of
+all 49,424 sessions (5.3 ms). Rewriting it as a `LATERAL ... LIMIT 1` with the
+new `(client_id, started_at DESC)` index brought that query to 0.26 ms and the
+endpoint back to 11 ms ([`after-nplus1.md`](loadtest/results/scale/after-nplus1.md)
+shows the regression).
+
+**What's still left at scale.** Of the dashboard's remaining 180 ms of DB time,
+about 140 ms is one window query that finds each client's last three sessions
+per exercise for the attention flags. It has to read every exercise the
+roster has ever logged (197,576 rows here). Giving it more sort memory only
+took it from 159 to 136 ms, and a per-client rewrite was slower (227 ms). The
+real fix is to maintain those occurrences when a workout is completed instead
+of computing them on read - listed under Known limitations.
+
+### 3.4 Query plans (EXPLAIN ANALYZE, same 200-client data)
+
+```bash
+loadtest/explain-scale.sh > loadtest/results/queries/scale-explain-before-indexes.txt
+# apply V13
+loadtest/explain-scale.sh > loadtest/results/queries/scale-explain-after-indexes.txt
+loadtest/explain-compare.py loadtest/results/queries/scale-explain-{before,after}-indexes.txt
+```
+
+| Query | Before ms | After ms | Change | Plan before | Plan after |
+|---|---:|---:|---:|---|---|
+| 1. Unread notification badge (polled every 30 s per open tab) | 2.025 | 0.054 | -97.3% | Bitmap Heap Scan on notifications | Index Only Scan (idx_notifications_user_unread) on notifications |
+| 2. Newest notifications page | 2.048 | 0.063 | -96.9% | Bitmap Heap Scan on notifications | Index Scan (idx_notifications_user_created) on notifications |
+| 3. A client's sessions in the last 7 days (dashboards, adherence, flags) | 0.105 | 0.052 | -50.5% | Bitmap Heap Scan on workout_sessions | Bitmap Heap Scan on workout_sessions |
+| 4. Workout history page, newest first | 2.031 | 0.048 | -97.6% | Index Scan Backward (idx_workout_sessions_started_at) on workout_sessions | Index Scan (idx_workout_sessions_client_started) on workout_sessions |
+| 5. Latest completed session per client, whole roster | 19.737 | 13.372 | -32.2% | Index Scan (idx_workout_sessions_client_id) on workout_sessions; Index Only Scan (uq_coach_clients) on coach_clients | Index Scan (idx_workout_sessions_client_started) on workout_sessions; Index Scan (idx_coach_clients_client_id) on coach_clients |
+| 6. A client's weigh-ins in the last 23 days | 0.283 | 0.118 | -58.3% | Bitmap Heap Scan on weight_entries | Bitmap Heap Scan on weight_entries |
+| 7. Latest weigh-in per client, whole roster | 55.184 | 22.406 | -59.4% | Seq Scan on weight_entries; Seq Scan on coach_clients | Index Scan (idx_weight_entries_client_recorded) on weight_entries; Index Scan (idx_coach_clients_client_id) on coach_clients |
+| 8. A client's recent personal records | 0.117 | 0.050 | -57.3% | Bitmap Heap Scan on personal_records | Index Scan (idx_personal_records_client_achieved) on personal_records |
+| 9. Newest message in a conversation | 0.226 | 0.028 | -87.6% | Bitmap Heap Scan on messages | Index Scan (idx_messages_conversation_created) on messages |
+| 10. Unread messages in a conversation | 0.090 | 0.044 | -51.1% | Bitmap Heap Scan on messages | Index Only Scan (idx_messages_conversation_unread) on messages |
+| 11. A client's active program assignment | 0.041 | 0.024 | -41.5% | Index Scan (idx_client_programs_client_id) on client_programs | Index Scan (idx_client_programs_client_status) on client_programs |
+
+### 3.5 Load test on seeded data (k6)
+
+```bash
+loadtest/run-matrix.sh after
+loadtest/summarize.py baseline after
+```
+
+Only the 50-user level has a clean result so far: the rest of the run was
+invalidated (the laptop went to sleep mid-run on battery, and another Docker
+stack started on the same VM), and was discarded rather than reported.
+
+| 50 VUs | Before | After | Change |
+|---|---:|---:|---:|
+| Throughput (req/s) | 41.7 | 41.8 | +0.2% (fixed by think time) |
+| p50 ms | 5.8 | 5.1 | -13.0% |
+| p95 ms | 41.0 | 15.2 | **-62.8%** |
+| p99 ms | 54.3 | 26.6 | -51.1% |
+| Errors | 0% | 0% | |
+
+Per endpoint (p95 ms): coach dashboard 54.9 -> 19.7 (-64.2%), coach roster
+59.7 -> 19.1 (-68.0%), coach's client history 19.3 -> 11.3 (-41.6%), client
+history 16.2 -> 12.7 (-21.6%), week strip 11.6 -> 10.5 (-9.5%). **Slower in
+this run:** client dashboard 15.7 -> 23.8 (+51.6%), weight dashboard
+6.9 -> 9.5 (+36.9%), exercise library 7.0 -> 8.7 (+24.8%), today's workout
+10.2 -> 11.7 (+15.0%). These are a few milliseconds on a single run and may be
+noise, but that will be settled by the full re-run rather than assumed.

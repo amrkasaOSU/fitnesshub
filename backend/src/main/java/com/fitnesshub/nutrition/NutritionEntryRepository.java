@@ -15,4 +15,6 @@ public interface NutritionEntryRepository extends JpaRepository<NutritionEntry, 
     Page<NutritionEntry> findByClientIdOrderByDateDesc(UUID clientId, Pageable pageable);
 
     List<NutritionEntry> findByClientIdAndDateBetweenOrderByDateAsc(UUID clientId, LocalDate from, LocalDate to);
+
+    List<NutritionEntry> findByClientIdInAndDateBetweenOrderByDateAsc(List<UUID> clientIds, LocalDate from, LocalDate to);
 }

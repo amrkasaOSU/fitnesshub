@@ -67,8 +67,9 @@ public class ClientController {
     @GetMapping
     @PreAuthorize("hasRole('COACH')")
     public ApiResponse<List<ClientSummaryDto>> list() {
-        List<CoachClient> active = coachClientService.activeClients(currentUser.id());
-        return ApiResponse.of(active.stream().map(cc -> coachClientService.summarize(cc.getClientId())).toList());
+        List<UUID> activeIds = coachClientService.activeClients(currentUser.id()).stream()
+                .map(CoachClient::getClientId).toList();
+        return ApiResponse.of(coachClientService.summarizeAll(activeIds));
     }
 
     @GetMapping("/{id}")
@@ -101,7 +102,8 @@ public class ClientController {
             @RequestParam(defaultValue = "20") int pageSize) {
         Page<WorkoutSession> result = workoutService.history(id,
                 PageRequest.of(page, Math.min(pageSize, 100), Sort.by(Sort.Direction.DESC, "startedAt")));
-        return ApiResponse.of(PageResponse.from(result.map(workoutService::toSummaryDto)));
+        var summaries = workoutService.toSummaryDtos(result.getContent());
+        return ApiResponse.of(PageResponse.from(result.map(session -> summaries.get(session.getId()))));
     }
 
     @GetMapping("/{id}/nutrition")

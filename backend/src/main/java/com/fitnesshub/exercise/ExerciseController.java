@@ -43,9 +43,8 @@ public class ExerciseController {
             @RequestParam(required = false) Equipment equipment,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
-        Page<Exercise> result = exerciseService.search(query, muscleGroup, equipment,
-                PageRequest.of(page, Math.min(pageSize, 100), Sort.by("name")));
-        return ApiResponse.of(PageResponse.from(result.map(exerciseMapper::toDto)));
+        return ApiResponse.of(exerciseService.searchCatalog(query, muscleGroup, equipment,
+                Math.max(page, 0), Math.max(1, Math.min(pageSize, 100))));
     }
 
     @GetMapping("/api/exercises/{id}")

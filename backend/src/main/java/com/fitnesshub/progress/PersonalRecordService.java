@@ -4,18 +4,19 @@ import com.fitnesshub.coach.CoachClient;
 import com.fitnesshub.coach.CoachClientRepository;
 import com.fitnesshub.coach.CoachClientStatus;
 import com.fitnesshub.exercise.Exercise;
+import com.fitnesshub.exercise.ExerciseCatalog;
 import com.fitnesshub.exercise.ExerciseRepository;
 import com.fitnesshub.notification.NotificationService;
 import com.fitnesshub.notification.NotificationType;
 import com.fitnesshub.progress.dto.PersonalRecordDto;
 import com.fitnesshub.workout.WorkoutSet;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -35,17 +36,20 @@ public class PersonalRecordService {
     private final PersonalRecordRepository personalRecordRepository;
     private final ProgressionService progressionService;
     private final ExerciseRepository exerciseRepository;
+    private final ExerciseCatalog exerciseCatalog;
     private final CoachClientRepository coachClientRepository;
     private final NotificationService notificationService;
 
     public PersonalRecordService(PersonalRecordRepository personalRecordRepository,
                                   ProgressionService progressionService,
                                   ExerciseRepository exerciseRepository,
+                                  ExerciseCatalog exerciseCatalog,
                                   CoachClientRepository coachClientRepository,
                                   NotificationService notificationService) {
         this.personalRecordRepository = personalRecordRepository;
         this.progressionService = progressionService;
         this.exerciseRepository = exerciseRepository;
+        this.exerciseCatalog = exerciseCatalog;
         this.coachClientRepository = coachClientRepository;
         this.notificationService = notificationService;
     }
@@ -117,8 +121,7 @@ public class PersonalRecordService {
 
     @Transactional(readOnly = true)
     public List<PersonalRecordDto> recentForClient(UUID clientId, int limit) {
-        List<PersonalRecord> records = personalRecordRepository.findByClientIdOrderByAchievedAtDesc(clientId);
-        return toDtos(records.stream().limit(limit).toList());
+        return toDtos(personalRecordRepository.findByClientIdOrderByAchievedAtDescIdAsc(clientId, PageRequest.of(0, limit)));
     }
 
     @Transactional(readOnly = true)
@@ -127,18 +130,20 @@ public class PersonalRecordService {
                 .filter(cc -> cc.getStatus() == CoachClientStatus.ACTIVE)
                 .map(CoachClient::getClientId)
                 .toList();
-        List<PersonalRecord> records = clientIds.stream()
-                .flatMap(id -> personalRecordRepository.findByClientIdOrderByAchievedAtDesc(id).stream())
-                .sorted(Comparator.comparing(PersonalRecord::getAchievedAt).reversed())
-                .limit(limit)
-                .toList();
-        return toDtos(records);
+        return recentForClients(clientIds, limit);
+    }
+
+    /** The newest records across a set of clients: one query, with the limit applied by the database. */
+    @Transactional(readOnly = true)
+    public List<PersonalRecordDto> recentForClients(List<UUID> clientIds, int limit) {
+        if (clientIds.isEmpty()) {
+            return List.of();
+        }
+        return toDtos(personalRecordRepository.findByClientIdInOrderByAchievedAtDescIdAsc(clientIds, PageRequest.of(0, limit)));
     }
 
     private List<PersonalRecordDto> toDtos(List<PersonalRecord> records) {
-        Map<UUID, String> exerciseNames = exerciseRepository
-                .findAllById(records.stream().map(PersonalRecord::getExerciseId).distinct().toList())
-                .stream().collect(Collectors.toMap(Exercise::getId, Exercise::getName));
+        Map<UUID, String> exerciseNames = records.isEmpty() ? Map.of() : exerciseCatalog.namesById();
         return records.stream().map(pr -> new PersonalRecordDto(pr.getId(), pr.getClientId(), pr.getExerciseId(),
                 exerciseNames.getOrDefault(pr.getExerciseId(), "Exercise"), pr.getRecordType(),
                 pr.getValue().stripTrailingZeros().toPlainString(), pr.getAchievedAt())).toList();

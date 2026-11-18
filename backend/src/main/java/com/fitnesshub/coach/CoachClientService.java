@@ -2,36 +2,35 @@ package com.fitnesshub.coach;
 
 import com.fitnesshub.analytics.AdherenceService;
 import com.fitnesshub.analytics.AttentionFlagService;
+import com.fitnesshub.analytics.ClientSnapshot;
+import com.fitnesshub.analytics.ClientSnapshotLoader;
 import com.fitnesshub.analytics.dto.AdherenceResult;
 import com.fitnesshub.audit.AuditAction;
 import com.fitnesshub.audit.AuditService;
 import com.fitnesshub.bodyweight.WeightService;
-import com.fitnesshub.bodyweight.dto.WeightDashboardDto;
 import com.fitnesshub.client.ClientProfile;
 import com.fitnesshub.client.ClientProfileRepository;
 import com.fitnesshub.coach.dto.ClientSummaryDto;
 import com.fitnesshub.coach.dto.CreateClientRequest;
 import com.fitnesshub.common.exception.ConflictException;
 import com.fitnesshub.common.exception.NotFoundException;
-import com.fitnesshub.nutrition.NutritionService;
-import com.fitnesshub.nutrition.dto.NutritionDashboardDto;
 import com.fitnesshub.security.AuthorizationService;
+import com.fitnesshub.nutrition.NutritionEntry;
 import com.fitnesshub.security.CurrentUser;
-import com.fitnesshub.steps.StepService;
-import com.fitnesshub.steps.dto.StepDashboardDto;
+import com.fitnesshub.steps.StepEntry;
 import com.fitnesshub.user.Role;
 import com.fitnesshub.user.User;
 import com.fitnesshub.user.UserRepository;
-import com.fitnesshub.workout.WorkoutSessionRepository;
-import com.fitnesshub.workout.WorkoutSessionStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -41,45 +40,39 @@ public class CoachClientService {
     private final ClientProfileRepository clientProfileRepository;
     private final CoachClientRepository coachClientRepository;
     private final CoachNoteRepository coachNoteRepository;
-    private final WorkoutSessionRepository workoutSessionRepository;
     private final PasswordEncoder passwordEncoder;
     private final CurrentUser currentUser;
     private final AuthorizationService authorizationService;
     private final AuditService auditService;
     private final WeightService weightService;
-    private final StepService stepService;
-    private final NutritionService nutritionService;
     private final AttentionFlagService attentionFlagService;
     private final AdherenceService adherenceService;
+    private final ClientSnapshotLoader snapshotLoader;
 
     public CoachClientService(UserRepository userRepository,
                                ClientProfileRepository clientProfileRepository,
                                CoachClientRepository coachClientRepository,
                                CoachNoteRepository coachNoteRepository,
-                               WorkoutSessionRepository workoutSessionRepository,
                                PasswordEncoder passwordEncoder,
                                CurrentUser currentUser,
                                AuthorizationService authorizationService,
                                AuditService auditService,
                                WeightService weightService,
-                               StepService stepService,
-                               NutritionService nutritionService,
                                AttentionFlagService attentionFlagService,
-                               AdherenceService adherenceService) {
+                               AdherenceService adherenceService,
+                               ClientSnapshotLoader snapshotLoader) {
         this.userRepository = userRepository;
         this.clientProfileRepository = clientProfileRepository;
         this.coachClientRepository = coachClientRepository;
         this.coachNoteRepository = coachNoteRepository;
-        this.workoutSessionRepository = workoutSessionRepository;
         this.passwordEncoder = passwordEncoder;
         this.currentUser = currentUser;
         this.authorizationService = authorizationService;
         this.auditService = auditService;
         this.weightService = weightService;
-        this.stepService = stepService;
-        this.nutritionService = nutritionService;
         this.attentionFlagService = attentionFlagService;
         this.adherenceService = adherenceService;
+        this.snapshotLoader = snapshotLoader;
     }
 
     /**
@@ -142,27 +135,68 @@ public class CoachClientService {
 
     @Transactional(readOnly = true)
     public ClientSummaryDto summarize(UUID clientId) {
-        User user = userRepository.findById(clientId).orElseThrow(() -> NotFoundException.of("User", clientId));
-        ClientProfile profile = clientProfileRepository.findByUserId(clientId).orElse(null);
+        List<ClientSummaryDto> summaries = summarizeAll(List.of(clientId));
+        if (summaries.isEmpty()) {
+            throw NotFoundException.of("User", clientId);
+        }
+        return summaries.get(0);
+    }
 
-        WeightDashboardDto weight = weightService.dashboard(clientId);
-        StepDashboardDto steps = stepService.dashboard(clientId);
-        NutritionDashboardDto nutrition = nutritionService.dashboard(clientId);
+    /**
+     * Roster rows for many clients at once, in the order the ids were given.
+     *
+     * <p>Everything is read through {@link ClientSnapshotLoader} - one query
+     * per table for the whole list - and the figures are then computed in
+     * memory by the same functions the client's own dashboard uses
+     * ({@link WeightService#weeklyAverage}, {@link AdherenceService#calculate},
+     * {@link AttentionFlagService#evaluate}), so the coach and the client can
+     * never be shown different numbers for the same metric. The cost is the
+     * same handful of queries for 5 clients or 500.
+     *
+     * <p>Callers are responsible for passing only ids the caller may see; this
+     * method is fed from the coach's own client list.
+     */
+    @Transactional(readOnly = true)
+    public List<ClientSummaryDto> summarizeAll(List<UUID> clientIds) {
+        Instant now = Instant.now();
+        return snapshotLoader.load(clientIds).values().stream()
+                .map(snapshot -> toSummary(snapshot, now))
+                .toList();
+    }
 
-        ZoneId zone = safeZone(user.getTimezone());
-        LocalDate today = LocalDate.now(zone);
-        AdherenceResult adherence = adherenceService.calculateForClient(clientId, today.minusDays(6), today, zone);
+    /** Snapshots for a coach's active clients, for callers that need more than the summary row. */
+    @Transactional(readOnly = true)
+    public Map<UUID, ClientSnapshot> snapshotsFor(List<UUID> clientIds) {
+        return snapshotLoader.load(clientIds);
+    }
 
-        var flags = attentionFlagService.computeFlags(clientId, zone);
-        Instant lastWorkout = workoutSessionRepository
-                .findFirstByClientIdAndStatusOrderByStartedAtDesc(clientId, WorkoutSessionStatus.COMPLETED)
-                .map(com.fitnesshub.workout.WorkoutSession::getStartedAt).orElse(null);
+    public ClientSummaryDto toSummary(ClientSnapshot snapshot, Instant now) {
+        User user = snapshot.user();
+        ClientProfile profile = snapshot.profile();
+        ZoneId zone = snapshot.zone();
+        LocalDate today = LocalDate.ofInstant(now, zone);
 
-        return new ClientSummaryDto(clientId, user.getFirstName(), user.getLastName(), user.getEmail(),
+        BigDecimal currentWeight = snapshot.latestWeight() == null ? null : snapshot.latestWeight().getWeight();
+        BigDecimal weeklyWeightChange = weightService.weeklyChange(snapshot.recentWeights(), zone, today);
+
+        AdherenceResult adherence = adherenceService.calculateFromSnapshot(snapshot, today.minusDays(6), today, zone);
+
+        int todaySteps = snapshot.recentSteps().stream()
+                .filter(s -> s.getDate().equals(today))
+                .map(StepEntry::getSteps)
+                .findFirst().orElse(0);
+        BigDecimal caloriesToday = snapshot.recentNutrition().stream()
+                .filter(n -> n.getDate().equals(today))
+                .map(NutritionEntry::getCalories)
+                .findFirst().orElse(BigDecimal.ZERO);
+
+        var flags = attentionFlagService.evaluate(snapshot, zone, now);
+
+        return new ClientSummaryDto(user.getId(), user.getFirstName(), user.getLastName(), user.getEmail(),
                 profile == null ? null : profile.getFitnessGoal(),
-                weight.current(), weight.weeklyChange(),
+                currentWeight, weeklyWeightChange,
                 adherence.adherencePercentage(),
-                lastWorkout, steps.todaySteps(), nutrition.caloriesConsumedToday(),
+                snapshot.lastCompletedWorkoutAt(), todaySteps, caloriesToday,
                 flags.stream().map(Enum::name).toList());
     }
 
@@ -182,11 +216,4 @@ public class CoachClientService {
         return coachNoteRepository.findByCoachIdAndClientIdOrderByCreatedAtDesc(coachId, clientId);
     }
 
-    private ZoneId safeZone(String tz) {
-        try {
-            return tz == null ? ZoneId.of("UTC") : ZoneId.of(tz);
-        } catch (Exception e) {
-            return ZoneId.of("UTC");
-        }
-    }
 }
