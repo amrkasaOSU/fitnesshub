@@ -59,8 +59,19 @@ public class OpenAiProvider implements AiProvider {
             }
             """;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    /**
+     * Spring's configured mapper, not a bare {@code new ObjectMapper()}. The
+     * context holds {@code Instant}s (record dates, session dates), which a
+     * bare mapper can't serialise: it threw, the catch below returned "{}",
+     * and the model was asked every question with no data at all. Found by
+     * the evaluation in loadtest/ai-eval; pinned by OpenAiProviderContextTest.
+     */
+    private final ObjectMapper objectMapper;
     private final HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+
+    public OpenAiProvider(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @Value("${fitnesshub.ai.openai.api-key:}")
     private String apiKey;
@@ -78,23 +89,34 @@ public class OpenAiProvider implements AiProvider {
 
     @Override
     public AiAnswer answerFitnessQuestion(FitnessContext context, String question) {
-        String userPrompt = "Client's question: \"" + question + "\"\n\nContext JSON:\n" + toJson(context);
-        return call(userPrompt);
+        return ask("Client's question: \"" + question + "\"", context);
     }
 
     @Override
     public AiAnswer analyzeExerciseProgress(FitnessContext context) {
-        String userPrompt = "Analyze this client's progress on the exercise described in the context and explain "
-                + "the trend in plain language.\n\nContext JSON:\n" + toJson(context);
-        return call(userPrompt);
+        return ask("Analyze this client's progress on the exercise described in the context and explain "
+                + "the trend in plain language.", context);
     }
 
     @Override
     public AiAnswer summarizeClientProgress(FitnessContext context) {
-        String userPrompt = "You are helping a coach prepare for a check-in with this client. Summarize top "
+        return ask("You are helping a coach prepare for a check-in with this client. Summarize top "
                 + "observations, potential concerns, positive progress, and 2-3 questions the coach should ask "
-                + "the client this week, based only on the context JSON below.\n\nContext JSON:\n" + toJson(context);
-        return call(userPrompt);
+                + "the client this week, based only on the context JSON below.", context);
+    }
+
+    private AiAnswer ask(String instruction, FitnessContext context) {
+        if (!isConfigured()) {
+            return AiAnswer.notConfigured();
+        }
+        String contextJson;
+        try {
+            contextJson = toJson(context);
+        } catch (IllegalStateException e) {
+            log.error("AI context could not be serialised; not calling the provider", e);
+            return AiAnswer.providerError("The assistant's data could not be prepared.");
+        }
+        return call(instruction + "\n\nContext JSON:\n" + contextJson);
     }
 
     private AiAnswer call(String userPrompt) {
@@ -161,11 +183,13 @@ public class OpenAiProvider implements AiProvider {
         return result;
     }
 
-    private String toJson(FitnessContext context) {
+    String toJson(FitnessContext context) {
         try {
             return objectMapper.writeValueAsString(context);
         } catch (Exception e) {
-            return "{}";
+            // Never send the question without its data: an empty context makes
+            // the model either refuse or invent, and the caller can't tell.
+            throw new IllegalStateException("Could not serialise the AI context", e);
         }
     }
 

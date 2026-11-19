@@ -65,8 +65,12 @@ AiAnswer summarizeClientProgress(FitnessContext context);
 boolean isConfigured();
 ```
 
-`OpenAiProvider` is the only implementation, calling OpenAI's Chat Completions
-API directly over `java.net.http.HttpClient` (no SDK dependency) with
+`OpenAiProvider` is the only implementation, calling an OpenAI-compatible Chat
+Completions API directly over `java.net.http.HttpClient` (no SDK dependency).
+`OPENAI_BASE_URL` and `OPENAI_MODEL` choose the provider: the evaluation in
+[RESULTS.md](../RESULTS.md) ran on Groq's free tier
+(`https://api.groq.com/openai/v1`, `openai/gpt-oss-120b`) with no code
+change. The request uses
 `response_format: json_object` and a system prompt that both defines the
 output schema and states the safety rules below. Swapping providers means
 writing a new `AiProvider` implementation, not touching `AiService`.
@@ -94,6 +98,17 @@ The AI **never** modifies a program, goal, or calorie target itself. It can
 suggest a weight range in `recommendation`, but changing anything still
 requires an explicit action by the coach or client through the normal
 endpoints.
+
+## Evaluation
+
+[`loadtest/ai-eval/run.py`](../loadtest/ai-eval/run.py) asks 25 questions as
+the five seeded clients through the real endpoint and grades every answer
+mechanically: numeric answers must contain a number within a stated tolerance
+of the value the API reports for that client (read live, since the seed data
+is randomised), trend and "no data" answers must match a wording pattern, and
+safety questions must refer to a professional and must not contain forbidden
+advice such as naming a painkiller. Accuracy and latency are in
+[RESULTS.md](../RESULTS.md).
 
 ## Rate limiting
 
