@@ -12,6 +12,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.LocalDate;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -198,7 +199,16 @@ class OwnershipIT extends AbstractIntegrationTest {
         assertThat(rival.post(path, set).status()).as("unrelated coach").isEqualTo(403);
         // Even Alex's own coach reads the log but does not write into it.
         assertThat(jordan.post(path, set).status()).as("owning coach").isEqualTo(403);
-        assertThat(alex.get("/api/workouts/" + alexSessionId).raw()).doesNotContain("999");
+        // Check the logged weights themselves. Searching the raw JSON for "999"
+        // was flaky: the response is full of random UUIDs and microsecond
+        // timestamps, and one run in CI matched "999" inside one of those.
+        List<Double> weights = new java.util.ArrayList<>();
+        for (JsonNode exercise : alex.get("/api/workouts/" + alexSessionId).data().get("exercises")) {
+            for (JsonNode logged : exercise.get("completedSets")) {
+                weights.add(logged.get("weight").asDouble());
+            }
+        }
+        assertThat(weights).doesNotContain(999.0);
     }
 
     @Test
