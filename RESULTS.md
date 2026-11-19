@@ -402,26 +402,140 @@ loadtest/explain-compare.py loadtest/results/queries/scale-explain-{before,after
 ### 3.5 Load test on seeded data (k6)
 
 ```bash
-loadtest/run-matrix.sh after
+loadtest/run-matrix.sh after                 # 50 / 100 / 250 / 500 VUs, fresh seed
 loadtest/summarize.py baseline after
+k6 run -e VUS=100 -e DURATION=45s -e THINK=0 \
+  --summary-export loadtest/results/after-stress/vus-100.json loadtest/k6/read-mix.js
+loadtest/query-count.sh
 ```
 
-Only the 50-user level has a clean result so far: the rest of the run was
-invalidated (the laptop went to sleep mid-run on battery, and another Docker
-stack started on the same VM), and was discarded rather than reported.
+Same script, same stack, same seed data as section 1.2. (An earlier attempt
+was discarded unreported: the laptop slept mid-run on battery.)
 
-| 50 VUs | Before | After | Change |
+**Overall**
+
+| VUs | metric | before | after | change |
+|---:|---|---:|---:|---:|
+| 50 | req/s | 41.7 | 41.4 | -0.8% |
+| 50 | p50 ms | 5.8 | 11.1 | +90.2% |
+| 50 | p95 ms | 41.0 | 32.1 | -21.7% |
+| 50 | p99 ms | 54.3 | 44.6 | -17.9% |
+| 50 | error % | 0.0 | 0.0 | n/a |
+| 100 | req/s | 83.3 | 83.3 | +0.1% |
+| 100 | p50 ms | 4.8 | 7.1 | +46.9% |
+| 100 | p95 ms | 40.6 | 28.6 | -29.6% |
+| 100 | p99 ms | 55.4 | 43.0 | -22.3% |
+| 100 | error % | 0.0 | 0.0 | n/a |
+| 250 | req/s | 208.7 | 209.5 | +0.4% |
+| 250 | p50 ms | 4.9 | 5.0 | +3.7% |
+| 250 | p95 ms | 39.8 | 19.2 | -51.8% |
+| 250 | p99 ms | 57.5 | 35.6 | -38.0% |
+| 250 | error % | 0.0 | 0.0 | n/a |
+| 500 | req/s | 414.8 | 418.5 | +0.9% |
+| 500 | p50 ms | 6.7 | 4.3 | -35.5% |
+| 500 | p95 ms | 46.5 | 13.8 | -70.3% |
+| 500 | p99 ms | 124.9 | 24.6 | -80.3% |
+| 500 | error % | 0.0 | 0.0 | n/a |
+
+Throughput at 50-500 VUs is fixed by the one-second think time, so latency is
+the comparison. **At 500 concurrent users p95 fell 70.3% (46.5 -> 13.8 ms) and
+p99 fell 80.3% (124.9 -> 24.6 ms)**, with 0% errors at every level.
+
+**p95 per endpoint at 500 VUs (ms)**
+| endpoint | before | after | change |
 |---|---:|---:|---:|
-| Throughput (req/s) | 41.7 | 41.8 | +0.2% (fixed by think time) |
-| p50 ms | 5.8 | 5.1 | -13.0% |
-| p95 ms | 41.0 | 15.2 | **-62.8%** |
-| p99 ms | 54.3 | 26.6 | -51.1% |
-| Errors | 0% | 0% | |
+| client_dashboard | 25.4 | 20.9 | -17.7% |
+| workout_today | 21.2 | 12.3 | -42.3% |
+| workout_week | 22.0 | 10.1 | -54.2% |
+| workout_history | 31.3 | 12.2 | -61.0% |
+| weight_dashboard | 15.7 | 9.8 | -37.8% |
+| exercises | 16.2 | 9.3 | -42.8% |
+| coach_dashboard | 86.1 | 18.9 | -78.0% |
+| coach_clients | 91.1 | 16.5 | -81.9% |
+| coach_client_workouts | 40.5 | 11.9 | -70.5% |
 
-Per endpoint (p95 ms): coach dashboard 54.9 -> 19.7 (-64.2%), coach roster
-59.7 -> 19.1 (-68.0%), coach's client history 19.3 -> 11.3 (-41.6%), client
-history 16.2 -> 12.7 (-21.6%), week strip 11.6 -> 10.5 (-9.5%). **Slower in
-this run:** client dashboard 15.7 -> 23.8 (+51.6%), weight dashboard
-6.9 -> 9.5 (+36.9%), exercise library 7.0 -> 8.7 (+24.8%), today's workout
-10.2 -> 11.7 (+15.0%). These are a few milliseconds on a single run and may be
-noise, but that will be settled by the full re-run rather than assumed.
+**Throughput ceiling** (no think time, 100 VUs, 45 s):
+
+| VUs | metric | before | after | change |
+|---:|---|---:|---:|---:|
+| 100 | req/s | 1072.2 | 1971.8 | +83.9% |
+| 100 | p50 ms | 55.2 | 34.7 | -37.1% |
+| 100 | p95 ms | 230.9 | 108.3 | -53.1% |
+| 100 | p99 ms | 397.3 | 152.3 | -61.7% |
+| 100 | error % | 0.0 | 0.0 | n/a |
+
+**+83.9% throughput (1,072 -> 1,972 requests/second) at a 53.1% lower p95.**
+
+**SQL statements per request** (seeded data; `loadtest/query-count.sh`):
+
+| Endpoint | Before | After |
+|---|---:|---:|
+| Coach dashboard | 415 | **18** |
+| Coach client roster | 394 | **15** |
+| Workout history (20 rows) | 82 | **6** |
+| Coach's view of a client's history | 83 | 7 |
+| Client dashboard | 60 | 31 |
+| Week strip | 35 | 5 |
+| Today's workout | 33 | 9 |
+| Coach conversations | 16 | 4 |
+| Exercise library | 1 | **0** (Redis) |
+| Weight dashboard | 3 | 3 |
+
+Full table: [`after-statements-per-request.md`](loadtest/results/queries/after-statements-per-request.md).
+
+### 3.6 The low-load "regression" that wasn't
+
+In the run above, at 50 and 100 VUs the cheap client endpoints looked 2-4x
+*slower* - including the weight dashboard, whose code did not change (3 SQL
+statements before and after). Rather than report or hide that, I tested it.
+
+**Interleaved A/B** - original and new build alternated twice on freshly
+seeded databases (`loadtest/ab-control.sh fitnesshub-backend:baseline
+fitnesshub-backend:indexed "50 100" 2`): the new build's overall p95 was lower
+in every pairing (50 VUs: 28.6 / 33.1 ms vs 40.3 / 44.7; 100 VUs: 22.3 / 26.5
+vs 45.3 / 35.7), but the cheap endpoints really were slower (weight dashboard
+at 100 VUs: 15.7 / 20.2 ms vs 8.6 / 4.6). So it was reproducible.
+
+**Hypothesis:** the new build does far less CPU work per second, so the VM's
+cores sit idle and drop into low-power states, and each light request then
+runs on a cold core. **Test:** repeat at 50 VUs with one container spinning a
+single core inside the same VM (`loadtest/burner-test.sh`):
+
+| 50 VUs, p95 ms | Original, idle | New, idle | Original, 1 core busy | New, 1 core busy |
+|---|---:|---:|---:|---:|
+| Overall | 46.1 | 33.5 | 35.9 | **9.8** |
+| Weight dashboard (unchanged code) | 13.5 | 26.6 | 5.5 | 5.0 |
+| Exercise library | 12.6 | 23.4 | 5.3 | 5.4 |
+| Today's workout | 21.2 | 31.1 | 7.6 | 7.1 |
+| Client dashboard | 32.1 | 44.6 | 12.3 | 15.4 |
+| Coach dashboard | 72.7 | 37.7 | 48.7 | **13.6** |
+
+With a core kept awake, the unchanged endpoints match (5.0 vs 5.5 ms) and the
+new build's overall p95 is **72.7% lower** (35.9 -> 9.8 ms). The slowdown was
+CPU power management reacting to a lighter workload, not the code. One real
+cost remains: the client dashboard is ~3 ms slower (12.3 -> 15.4 ms), which is
+the price of bug fix #4 in section 2.3 - it now runs in a read-write
+transaction so today's session is actually saved.
+
+### 3.7 Does the exercise-library cache help? (A/B)
+
+A cache is a cost (another moving part, possible staleness), so it has to
+earn its place. `fitnesshub.cache.exercise-catalog.enabled` switches it off;
+the endpoint was then hammered with no think time, 50 VUs for 30 s, cache on
+and off alternated twice:
+
+```bash
+EXERCISE_CACHE=true|false docker compose -f loadtest/docker-compose.loadtest.yml up -d --no-deps --force-recreate backend
+k6 run -e VUS=50 -e DURATION=30s loadtest/k6/exercise-library.js
+```
+
+| Run | req/s | p50 ms | p95 ms | p99 ms | Errors |
+|---|---:|---:|---:|---:|---:|
+| Cache on, round 1 | 5,755 | 8.20 | 12.76 | 16.14 | 0% |
+| Cache off, round 1 | 4,081 | 11.10 | 21.52 | 30.09 | 0% |
+| Cache on, round 2 | 5,051 | 9.38 | 14.54 | 18.99 | 0% |
+| Cache off, round 2 | 3,337 | 13.30 | 27.38 | 40.21 | 0% |
+
+**Cache on: +41% and +51% throughput, -41% and -47% p95**, consistent across
+both rounds, and zero database queries for the endpoint. It stays. Raw:
+[`loadtest/results/cache-ab/`](loadtest/results/cache-ab/).

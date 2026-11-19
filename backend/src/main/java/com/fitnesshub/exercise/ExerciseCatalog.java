@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fitnesshub.exercise.dto.ExerciseDto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,9 @@ import java.util.stream.Collectors;
  *       fix).</li>
  *   <li><b>Redis being down is not an outage.</b> Any cache failure falls
  *       through to the database, logged once at WARN.</li>
+ *   <li><b>It can be switched off</b> ({@code
+ *       fitnesshub.cache.exercise-catalog.enabled=false}) so its effect can
+ *       be measured rather than assumed; see RESULTS.md.</li>
  * </ul>
  */
 @Service
@@ -51,17 +55,23 @@ public class ExerciseCatalog {
     private final ExerciseMapper exerciseMapper;
     private final StringRedisTemplate redis;
     private final ObjectMapper objectMapper;
+    private final boolean cacheEnabled;
 
     public ExerciseCatalog(ExerciseRepository exerciseRepository, ExerciseMapper exerciseMapper,
-                           StringRedisTemplate redis, ObjectMapper objectMapper) {
+                           StringRedisTemplate redis, ObjectMapper objectMapper,
+                           @Value("${fitnesshub.cache.exercise-catalog.enabled:true}") boolean cacheEnabled) {
         this.exerciseRepository = exerciseRepository;
         this.exerciseMapper = exerciseMapper;
         this.redis = redis;
         this.objectMapper = objectMapper;
+        this.cacheEnabled = cacheEnabled;
     }
 
     /** Every exercise, ordered by name exactly as the database orders them. */
     public List<ExerciseDto> all() {
+        if (!cacheEnabled) {
+            return loadFromDatabase();
+        }
         List<ExerciseDto> cached = readCache();
         if (cached != null) {
             return cached;
