@@ -43,16 +43,35 @@ small enough that substring matching works, and the broader context (weight,
 adherence, nutrition) is cheap enough to always include rather than trying to
 predict what's relevant.
 
-### Worked example: "Should I attempt 225 on bench today?"
+### Worked example: "Should I attempt 225 on bench press today?"
 
-For the seeded `client1@fitnesshub.local`, the context includes bench press's
-last several sessions - weight climbing 185→190→195→200 lb, RPE climbing
-alongside it, with the most recent estimated 1RM essentially flat versus the
-session before it. The model is handed that data (not told the answer) and
-is expected to reason "your estimated 1RM has plateaued around 240 lb, RPE has
-been high the last two sessions - 225 would be an aggressive jump" rather than
-a scripted response. See `SeedDataRunner#seedClient1_StrengthSuccess` for how
-that history is built, and `ProgressionServiceTest` for the underlying math.
+A real answer, from evaluation run 2 against the seeded `client1@fitnesshub.local`
+(Groq, `openai/gpt-oss-120b`, 1,602 ms end to end):
+
+> Your recent data shows a best bench weight of 200 lb and an estimated 1RM
+> of about 241 lb, but both volume and performance trends are down and you
+> haven't logged any recent failures. While your goal is 225 lb and you're 91%
+> toward it, it would be safer to work up to a sub-max load (e.g., 210-215 lb)
+> with good form today and aim for the full 225 lb on a stronger session.
+
+`relevantMetrics` came back as `bestWeight`, `bestEstimated1Rm`,
+`volumeTrend`, `performanceTrend`, `recentAverageRpe`, `recentFailureRate` and
+`activeGoals`. The 200 lb and 241 lb figures match what the progress endpoint
+reports for that client (200 and 240.67). None of that was possible before
+the fix described below.
+
+### The bug that hid all of this
+
+Until the evaluation was built, every answer was produced from an **empty
+context**. `OpenAiProvider` serialised the context with a bare
+`new ObjectMapper()`, which can't handle the `Instant`s in personal-record and
+session dates. It threw, the catch block returned `"{}"`, and the model was
+asked every question with no data at all. The first evaluation run surfaced
+it immediately: asked for a body weight the dashboard displays, the
+assistant said it didn't have one. The provider now uses Spring's configured
+`ObjectMapper`, a context that can't be serialised is logged at ERROR and
+answered with the graceful fallback instead of being sent empty, and
+`OpenAiProviderContextTest` pins it.
 
 ## Provider abstraction
 
