@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/query-error";
 import {
   Select,
   SelectContent,
@@ -31,7 +32,7 @@ export default function ProgramDetailPage({ params }: { params: Promise<{ id: st
   const [clientId, setClientId] = useState("");
   const [startDate, setStartDate] = useState(todayLocal());
 
-  const { data: program, isLoading } = useQuery({
+  const { data: program, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["program", id],
     queryFn: () => api.get<ProgramDto>(`/api/programs/${id}`),
   });
@@ -51,6 +52,7 @@ export default function ProgramDetailPage({ params }: { params: Promise<{ id: st
     onError: (e) => toast.error(e.message),
   });
 
+  if (isError) return <QueryError error={error} onRetry={() => refetch()} what="this program" />;
   if (isLoading || !program) return <Skeleton className="h-96" />;
 
   return (

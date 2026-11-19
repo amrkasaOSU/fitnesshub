@@ -43,3 +43,5 @@ dump.rdb
 loadtest/results/lighthouse/*/*-[0-9].json
 loadtest/results/snapshots/
 loadtest/results/*.log
+
+loadtest/lighthouse/node_modules/

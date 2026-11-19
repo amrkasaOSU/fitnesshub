@@ -24,19 +24,25 @@ export function RestTimer({ seconds, onDismiss }: { seconds: number; onDismiss: 
 
   return (
     <div className="flex items-center gap-3 rounded-lg border bg-primary/5 px-4 py-3">
-      <div className="font-mono text-2xl font-bold tabular-nums">
+      {/* role="timer" is implicitly aria-live="off": announcing every tick would drown out everything else. */}
+      <div className="font-mono text-2xl font-bold tabular-nums" role="timer" aria-label="Rest time remaining">
         {minutes.toString().padStart(2, "0")}:{secs.toString().padStart(2, "0")}
       </div>
       <span className="text-sm text-muted-foreground">Rest</span>
       <div className="ml-auto flex gap-2">
-        <Button size="icon" variant="outline" onClick={() => setPaused((p) => !p)}>
-          {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+        <Button
+          size="icon"
+          variant="outline"
+          onClick={() => setPaused((p) => !p)}
+          aria-label={paused ? "Resume rest timer" : "Pause rest timer"}
+        >
+          {paused ? <Play className="h-4 w-4" aria-hidden="true" /> : <Pause className="h-4 w-4" aria-hidden="true" />}
         </Button>
-        <Button size="icon" variant="outline" onClick={() => setRemaining(seconds)}>
-          <RotateCcw className="h-4 w-4" />
+        <Button size="icon" variant="outline" onClick={() => setRemaining(seconds)} aria-label="Restart rest timer">
+          <RotateCcw className="h-4 w-4" aria-hidden="true" />
         </Button>
-        <Button size="icon" variant="outline" onClick={onDismiss}>
-          <X className="h-4 w-4" />
+        <Button size="icon" variant="outline" onClick={onDismiss} aria-label="Dismiss rest timer">
+          <X className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
     </div>

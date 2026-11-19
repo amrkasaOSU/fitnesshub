@@ -1,20 +1,24 @@
 #!/usr/bin/env node
 // Lighthouse scores for the main pages, signed-in pages included.
 //
-//   node loadtest/lighthouse/run.mjs baseline
+//   (cd loadtest/lighthouse && npm ci) && node loadtest/lighthouse/run.mjs <label>
 //
-// Runs against the production build served by the load-test stack
-// (`docker compose -f loadtest/docker-compose.loadtest.yml --profile ui up -d`),
-// never the dev server - dev mode ships unminified bundles and would understate
-// every score. Each page is audited RUNS times and the median run is kept,
-// because a single Lighthouse performance score swings by several points.
+// Audits the production build served by the load-test stack, never the dev
+// server. Each page is audited RUNS times and the median run kept.
 //
-// Signed-in pages work by logging in over the API first and handing the session
-// cookie to Chrome as an extra header, so the app's own requests authenticate.
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+// Signed-in pages: the session cookie is placed in Chrome's own cookie jar
+// (exactly where a real login puts it) and Lighthouse is told not to clear
+// storage. An earlier version injected it as an extra Cookie header instead;
+// Chrome dropped that header as soon as the app received its first cookie,
+// every later API call came back 401, and the "signed-in" scores were of a
+// page that never loaded. So every audit is now rejected unless all of the
+// page's API calls succeeded.
+import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import lighthouse from "lighthouse";
+import * as chromeLauncher from "chrome-launcher";
+import puppeteer from "puppeteer-core";
 
 const label = process.argv[2];
 if (!label) {
@@ -25,6 +29,7 @@ const FRONTEND = process.env.FRONTEND_URL ?? "http://localhost:13000";
 const BACKEND = process.env.BACKEND_URL ?? "http://localhost:18080";
 const RUNS = Number(process.env.RUNS ?? 3);
 const PASSWORD = "FitnessHub!2024"; // published demo password, seed data only
+const only = process.env.PAGES ? process.env.PAGES.split(",") : null;
 const outDir = join(dirname(fileURLToPath(import.meta.url)), "..", "results", "lighthouse", label);
 mkdirSync(outDir, { recursive: true });
 
@@ -39,90 +44,84 @@ const pages = [
   { name: "coach-clients", path: "/coach/clients", as: "coach@fitnesshub.local" },
 ];
 
-// PAGES=landing,client-dashboard limits the run to a subset.
-const only = process.env.PAGES ? process.env.PAGES.split(",") : null;
-
 async function sessionCookie(email) {
-  // Each page takes long enough that Node's pooled keep-alive socket to the
-  // backend has usually been closed by the next login, so ask for a fresh
-  // connection and retry once or twice rather than fail a 10-minute run.
-  let lastError;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch(`${BACKEND}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Connection: "close" },
-        body: JSON.stringify({ email, password: PASSWORD }),
-      });
-      if (!res.ok) throw new Error(`login failed for ${email}: ${res.status}`);
-      const cookie = res.headers.getSetCookie().find((c) => c.startsWith("SESSION="));
-      return cookie.split(";")[0];
-    } catch (e) {
-      lastError = e;
-      await new Promise((r) => setTimeout(r, 500));
-    }
-  }
-  throw lastError;
+  const res = await fetch(`${BACKEND}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Connection: "close" },
+    body: JSON.stringify({ email, password: PASSWORD }),
+  });
+  if (!res.ok) throw new Error(`login failed for ${email}: ${res.status}`);
+  return res.headers.getSetCookie().find((c) => c.startsWith("SESSION=")).split(";")[0].slice("SESSION=".length);
 }
 
-// Headless Chrome occasionally fails to paint (NO_FCP) for no reason related
-// to the page, so a failed run is retried rather than aborting the whole
-// matrix. A report already on disk from an interrupted run is reused, which
-// makes the script resumable.
-function audit(args, out) {
-  const load = () => {
-    if (!existsSync(out)) return null;
-    try {
-      const report = JSON.parse(readFileSync(out, "utf8"));
-      return report.runtimeError || !report.categories?.performance?.score ? null : report;
-    } catch {
-      return null;
+async function auditOnce(page, sessionValue) {
+  const chrome = await chromeLauncher.launch({ chromeFlags: ["--headless=new", "--no-sandbox"] });
+  try {
+    if (sessionValue) {
+      // Chrome's debugging endpoint can lag a moment behind the process start.
+      let browser;
+      for (let attempt = 0; !browser; attempt++) {
+        try {
+          browser = await puppeteer.connect({ browserURL: `http://127.0.0.1:${chrome.port}` });
+        } catch (e) {
+          if (attempt >= 20) throw e;
+          await new Promise((r) => setTimeout(r, 250));
+        }
+      }
+      await browser.setCookie({
+        name: "SESSION", value: sessionValue, domain: "localhost", path: "/", httpOnly: true, sameSite: "Lax",
+      });
+      await browser.disconnect();
     }
-  };
-  let report = load();
-  for (let attempt = 0; !report && attempt < 3; attempt++) {
-    try {
-      execFileSync("npx", args, { stdio: ["ignore", "ignore", "inherit"] });
-    } catch {
-      // fall through to the validity check and retry
-    }
-    report = load();
+    const result = await lighthouse(`${FRONTEND}${page.path}`, {
+      port: chrome.port,
+      output: "json",
+      logLevel: "error",
+      onlyCategories: ["performance", "accessibility", "best-practices", "seo"],
+      disableStorageReset: !!sessionValue,
+    });
+    return result.lhr;
+  } finally {
+    await chrome.kill();
   }
-  if (!report) throw new Error(`lighthouse failed 3 times for ${out}`);
-  return report;
+}
+
+function validate(page, lhr) {
+  if (lhr.runtimeError) return `runtime error ${lhr.runtimeError.code}`;
+  if (page.as && !lhr.finalDisplayedUrl.includes(page.path)) return `ended on ${lhr.finalDisplayedUrl}`;
+  const failed = lhr.audits["network-requests"].details.items
+    .filter((r) => r.url.startsWith(BACKEND) && (r.statusCode ?? 0) >= 400)
+    .map((r) => `${r.statusCode} ${r.url.slice(BACKEND.length)}`);
+  if (failed.length) return `API errors: ${failed.join(", ")}`;
+  return null;
 }
 
 const median = (xs) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)];
 
 const summary = [];
 for (const page of pages.filter((p) => !only || only.includes(p.name))) {
-  const cookie = page.as ? await sessionCookie(page.as) : null;
   const runs = [];
-  for (let i = 0; i < RUNS; i++) {
-    const out = join(outDir, `${page.name}-${i + 1}.json`);
-    const args = [
-      "--yes", "lighthouse@12", `${FRONTEND}${page.path}`,
-      "--quiet", "--output=json", `--output-path=${out}`,
-      "--only-categories=performance,accessibility,best-practices,seo",
-      "--chrome-flags=--headless=new --no-sandbox",
-    ];
-    if (cookie) args.push(`--extra-headers=${JSON.stringify({ Cookie: cookie })}`);
-    const report = audit(args, out);
-    // A signed-in audit that got bounced to /login would silently score the login page.
-    if (page.as && !report.finalDisplayedUrl.includes(page.path)) {
-      throw new Error(`${page.name} ended on ${report.finalDisplayedUrl}, not ${page.path}`);
+  while (runs.length < RUNS) {
+    let lhr, problem;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const session = page.as ? await sessionCookie(page.as) : null;
+      lhr = await auditOnce(page, session);
+      problem = validate(page, lhr);
+      if (!problem) break;
+      console.error(`  ${page.name}: rejected run (${problem}), retrying`);
     }
+    if (problem) throw new Error(`${page.name}: ${problem}`);
+    writeFileSync(join(outDir, `${page.name}-${runs.length + 1}.json`), JSON.stringify(lhr));
+    const a11yRefs = lhr.categories.accessibility.auditRefs.filter((r) => r.weight > 0).map((r) => r.id);
     runs.push({
-      performance: Math.round(report.categories.performance.score * 100),
-      accessibility: Math.round(report.categories.accessibility.score * 100),
-      bestPractices: Math.round(report.categories["best-practices"].score * 100),
-      seo: Math.round(report.categories.seo.score * 100),
-      lcpMs: Math.round(report.audits["largest-contentful-paint"].numericValue),
-      tbtMs: Math.round(report.audits["total-blocking-time"].numericValue),
-      cls: Number(report.audits["cumulative-layout-shift"].numericValue.toFixed(3)),
-      failedA11y: Object.values(report.audits)
-        .filter((a) => report.categories.accessibility.auditRefs.some((r) => r.id === a.id) && a.score === 0)
-        .map((a) => a.id),
+      performance: Math.round(lhr.categories.performance.score * 100),
+      accessibility: Math.round(lhr.categories.accessibility.score * 100),
+      bestPractices: Math.round(lhr.categories["best-practices"].score * 100),
+      seo: Math.round(lhr.categories.seo.score * 100),
+      lcpMs: Math.round(lhr.audits["largest-contentful-paint"].numericValue),
+      tbtMs: Math.round(lhr.audits["total-blocking-time"].numericValue),
+      cls: Number(lhr.audits["cumulative-layout-shift"].numericValue.toFixed(3)),
+      failedA11y: a11yRefs.filter((id) => lhr.audits[id]?.score === 0),
     });
   }
   const row = { page: page.name, path: page.path };

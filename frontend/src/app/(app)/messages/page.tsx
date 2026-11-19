@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { QueryError } from "@/components/query-error";
 
 export default function MessagesPage() {
   const { data: user } = useCurrentUser();
@@ -18,7 +19,7 @@ export default function MessagesPage() {
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["messages"],
     queryFn: () => api.get<PageResponse<MessageDto>>("/api/messages", { pageSize: 100 }),
     refetchInterval: 5000,
@@ -44,7 +45,8 @@ export default function MessagesPage() {
       <Card className="flex flex-1 flex-col overflow-hidden">
         <CardContent className="flex-1 space-y-3 overflow-y-auto p-4">
           {isLoading && <Skeleton className="h-full" />}
-          {!isLoading && messages.length === 0 && (
+          {isError && <QueryError error={error} onRetry={() => refetch()} what="your messages" />}
+          {!isLoading && !isError && messages.length === 0 && (
             <p className="text-sm text-muted-foreground">No messages yet. Say hello!</p>
           )}
           {messages.map((m) => {
@@ -58,7 +60,7 @@ export default function MessagesPage() {
                   )}
                 >
                   {m.content}
-                  <div className={cn("mt-1 text-[10px] opacity-70")}>
+                  <div className={cn("mt-1 text-xs opacity-80")}>
                     {new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                   </div>
                 </div>
@@ -72,6 +74,7 @@ export default function MessagesPage() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Type a message..."
+            aria-label="Message"
             className="min-h-10 resize-none"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -80,8 +83,13 @@ export default function MessagesPage() {
               }
             }}
           />
-          <Button size="icon" disabled={!draft.trim() || send.isPending} onClick={() => send.mutate(draft.trim())}>
-            <Send className="h-4 w-4" />
+          <Button
+            size="icon"
+            aria-label="Send message"
+            disabled={!draft.trim() || send.isPending}
+            onClick={() => send.mutate(draft.trim())}
+          >
+            <Send className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
       </Card>

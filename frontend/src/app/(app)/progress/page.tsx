@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatCard } from "@/components/stat-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/query-error";
 
 export default function ProgressPage() {
   const [exerciseId, setExerciseId] = useState<string>("");
@@ -18,7 +19,7 @@ export default function ProgressPage() {
     queryFn: () => api.get<PageResponse<ExerciseDto>>("/api/exercises", { pageSize: 100 }),
   });
 
-  const { data: progress, isLoading } = useQuery({
+  const { data: progress, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["exercise-progress", exerciseId],
     queryFn: () => api.get<ExerciseProgressSummary>(`/api/exercises/${exerciseId}/progress`),
     enabled: !!exerciseId,
@@ -37,7 +38,7 @@ export default function ProgressPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Progress</h1>
         <Select value={exerciseId} onValueChange={setExerciseId}>
-          <SelectTrigger className="w-64">
+          <SelectTrigger className="w-full sm:w-64" aria-label="Exercise">
             <SelectValue placeholder="Select an exercise" />
           </SelectTrigger>
           <SelectContent>
@@ -55,6 +56,9 @@ export default function ProgressPage() {
       )}
 
       {exerciseId && isLoading && <Skeleton className="h-96" />}
+      {exerciseId && isError && (
+        <QueryError error={error} onRetry={() => refetch()} what="progress for this exercise" />
+      )}
 
       {exerciseId && progress && (
         <>

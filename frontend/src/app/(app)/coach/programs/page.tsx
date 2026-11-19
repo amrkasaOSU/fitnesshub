@@ -9,9 +9,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/query-error";
 
 export default function CoachProgramsPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["programs"],
     queryFn: () => api.get<PageResponse<ProgramSummaryDto>>("/api/programs", { pageSize: 50 }),
   });
@@ -35,8 +36,9 @@ export default function CoachProgramsPage() {
       </div>
 
       {isLoading && <Skeleton className="h-64" />}
+      {isError && <QueryError error={error} onRetry={() => refetch()} what="your programs" />}
 
-      {!isLoading && programs.length === 0 && (
+      {!isLoading && !isError && programs.length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <CalendarRange className="h-8 w-8 text-muted-foreground" />

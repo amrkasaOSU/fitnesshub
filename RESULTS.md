@@ -194,33 +194,40 @@ Query plans at this scale, before any index change:
 ### 1.6 Lighthouse (main pages)
 
 ```bash
-docker compose -f loadtest/docker-compose.loadtest.yml --profile ui up -d --build frontend
-node loadtest/lighthouse/run.mjs baseline
+(cd loadtest/lighthouse && npm ci)
+loadtest/lighthouse/compare.sh fitnesshub-frontend:baseline fitnesshub-frontend:after
 ```
 
-Lighthouse 12, headless Chrome, default mobile emulation with simulated
-throttling, against the **production build** of the frontend (never the dev
-server). Each page is audited 3 times and the median kept. Signed-in pages
-are audited with a real session cookie, and the script fails if an audit
-ends anywhere other than the page it asked for (so a redirect to `/login`
-can't be scored by mistake). Per-page summaries:
-[`loadtest/results/lighthouse/baseline/summary.json`](loadtest/results/lighthouse/baseline/summary.json).
+Lighthouse 12.8.2, headless Chrome, default mobile emulation with simulated
+throttling, against the **production build** of the frontend. Each page is
+audited 3 times and the median kept. The baseline image is the frontend built
+from the starting commit (`e930be3`); both audits use the same backend and
+database, so the frontend is the only variable.
+
+> **Correction.** The first version of this section reported signed-in
+> scores that were invalid. The runner passed the session as an injected
+> `Cookie` header; Chrome dropped that header once the app received its first
+> cookie, so every later API call returned 401 and the "dashboard" being
+> scored was an empty skeleton (the final screenshots prove it). The runner
+> now puts the session in Chrome's cookie jar, exactly as a real login does,
+> and **rejects any audit in which an API call failed**. All numbers below
+> are from the corrected runner. Diagnosis: section 4.3.
 
 | page | performance | accessibility | best practices | SEO | LCP ms | TBT ms | CLS | failing a11y audits |
 |---|---:|---:|---:|---:|---:|---:|---:|---|
-| landing | 99 | 100 | 100 | 100 | 2262 | 18 | 0 | none |
-| login | 97 | 100 | 100 | 100 | 2621 | 8 | 0 | none |
-| pricing | 98 | 100 | 100 | 100 | 2482 | 11 | 0 | none |
-| client-dashboard | 91 | 91 | 93 | 100 | 3423 | 9 | 0 | color-contrast, link-name |
-| workout-today | 90 | 91 | 93 | 100 | 3581 | 7 | 0 | color-contrast, link-name |
-| progress | 87 | 84 | 96 | 100 | 4030 | 24 | 0 | button-name, color-contrast, link-name |
-| coach-dashboard | 90 | 91 | 93 | 100 | 3551 | 56 | 0 | color-contrast, link-name |
-| coach-clients | 85 | 91 | 96 | 100 | 4421 | 12 | 0 | color-contrast, link-name |
+| landing | 98 | 100 | 100 | 100 | 2468 | 7 | 0 | none |
+| login | 97 | 100 | 100 | 100 | 2619 | 6 | 0 | none |
+| pricing | 98 | 100 | 100 | 100 | 2470 | 9 | 0 | none |
+| client-dashboard | 85 | 92 | 100 | 90 | 4311 | 16 | 0 | aria-progressbar-name, color-contrast |
+| workout-today | 91 | 95 | 96 | 100 | 3568 | 8 | 0.011 | color-contrast |
+| progress | 87 | 89 | 100 | 100 | 4036 | 10 | 0 | button-name, color-contrast |
+| coach-dashboard | 86 | 96 | 100 | 100 | 4306 | 9 | 0 | color-contrast |
+| coach-clients | 89 | 96 | 100 | 100 | 3829 | 11 | 0 | color-contrast |
 
-Public pages are already near-perfect. Every signed-in page loses
-accessibility points to the same two audits (`color-contrast`, and
-`link-name` - the notification bell is an icon-only link with no accessible
-name), and `/progress` also has an icon-only button with no name.
+Public pages are already near-perfect. Signed-in pages lose accessibility
+points to low-contrast grey text, unlabelled progress bars, an icon-only
+button with no name (`/progress`), and the dashboard loses SEO points to a
+link whose only text is "Start".
 
 ## 2. Integration and end-to-end tests
 
@@ -539,3 +546,70 @@ k6 run -e VUS=50 -e DURATION=30s loadtest/k6/exercise-library.js
 **Cache on: +41% and +51% throughput, -41% and -47% p95**, consistent across
 both rounds, and zero database queries for the endpoint. It stays. Raw:
 [`loadtest/results/cache-ab/`](loadtest/results/cache-ab/).
+
+## 4. Frontend polish
+
+### 4.1 What changed
+
+| Area | Change |
+|---|---|
+| **Bug: timezone never recorded** | No code ever set a user's timezone, so every account stayed on UTC and, for a client in New York, "today" rolled over at 7 pm - evening step and food logs landed on a different day from the one the dashboard showed, and the next day's workout appeared early. The app now saves the browser's timezone after sign-in (E2E test: `timezone.spec.ts`). |
+| **Bug: progress bars had no value** | The shared `Progress` component dropped its `value` prop instead of passing it to Radix, so every bar told assistive technology it was "indeterminate". |
+| Error states | Pages showed a skeleton forever when a request failed, and list pages showed their empty state ("No clients yet") - false information. A shared `QueryError` card with a working **Try again** now appears on the dashboard, coach dashboard, roster, programs, check-ins, today's workout, workout detail, history, messages, notifications and progress. |
+| Mobile | The coach inbox put a fixed 288 px list beside the thread, leaving the thread unusably narrow on a phone; phones now get list-then-thread with a back button. Roster search goes full width; the tab bar respects the iPhone home indicator and has 48 px touch targets. |
+| Accessibility | Names for icon-only controls (notification bell, account menu, send, rest-timer buttons, exercise picker), the notification count included in the bell's name, labelled set inputs per exercise, `aria-current` on navigation, landmarks named, decorative icons hidden, muted text contrast raised from 4.34:1 to 5.50:1, past days in the week strip no longer faded below 3:1, sub-12 px text raised to 12 px, a real `h1` on login and register. |
+| SEO | The dashboard's "Start" / "View" link now says "Start workout" / "View workout". |
+
+### 4.2 Lighthouse, before -> after
+
+```bash
+loadtest/lighthouse/compare.sh fitnesshub-frontend:baseline fitnesshub-frontend:after
+```
+
+| Page | Performance | Accessibility | Best practices | SEO |
+|---|---|---|---|---|
+| landing | 98 -> 98 | 100 -> **100** | 100 -> 100 | 100 -> 100 |
+| login | 97 -> 97 | 100 -> **100** | 100 -> 100 | 100 -> 100 |
+| pricing | 98 -> 98 | 100 -> **100** | 100 -> 100 | 100 -> 100 |
+| client-dashboard | 85 -> 90 | 92 -> **100** | 100 -> 100 | 90 -> 100 |
+| workout-today | 91 -> 89 | 95 -> **100** | 96 -> 100 | 100 -> 100 |
+| progress | 87 -> 87 | 89 -> **100** | 100 -> 100 | 100 -> 100 |
+| coach-dashboard | 86 -> 85 | 96 -> **100** | 100 -> 100 | 100 -> 100 |
+| coach-clients | 89 -> 89 | 96 -> **100** | 100 -> 100 | 100 -> 100 |
+
+**Every audited page now scores 100 for accessibility, best practices and
+SEO** (signed-in pages were 89-96 for accessibility). Performance is unchanged
+within run-to-run noise (-2 to +5 points); none of these changes targeted load
+speed, and the public pages were already 97-98.
+
+Full after table (medians of 3):
+
+| page | performance | accessibility | best practices | SEO | LCP ms | TBT ms | CLS | failing a11y audits |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| landing | 98 | 100 | 100 | 100 | 2471 | 10 | 0 | none |
+| login | 97 | 100 | 100 | 100 | 2623 | 7 | 0 | none |
+| pricing | 98 | 100 | 100 | 100 | 2467 | 7 | 0 | none |
+| client-dashboard | 90 | 100 | 100 | 100 | 3709 | 7 | 0 | none |
+| workout-today | 89 | 100 | 100 | 100 | 3715 | 6 | 0.012 | none |
+| progress | 87 | 100 | 100 | 100 | 4072 | 14 | 0 | none |
+| coach-dashboard | 85 | 100 | 100 | 100 | 4315 | 8 | 0 | none |
+| coach-clients | 89 | 100 | 100 | 100 | 3844 | 5 | 0 | none |
+
+E2E: 17 tests (up from 12) - added the timezone sync, error-and-retry states,
+the failed-roster case, accessible names, and the coach pages on a phone.
+**34 / 34 passed** (`npx playwright test --repeat-each=2`).
+
+### 4.3 How the invalid Lighthouse numbers were caught
+
+After the first "after" audit, signed-in performance appeared to drop by about
+900 ms of LCP. The Largest Contentful Paint element had changed to
+`<p class="font-medium">` - the markup of the new error card. The audit's
+final screenshot showed **"Couldn't load your dashboard - Authentication is
+required"**, and the network log showed `/api/users/me` 200 followed by
+`/api/dashboard` 401. The baseline screenshot showed the same failure hidden
+behind an endless skeleton (the old code never showed errors). Reproducing in
+Chromium showed the cause: with a session injected as an extra `Cookie`
+header, the first request carried `SESSION=...`, but once the response set
+`XSRF-TOKEN`, Chrome sent only `XSRF-TOKEN=...` and the session was gone. With
+the cookie in the browser's jar, every call succeeded. The new error state is
+what made a silent measurement bug visible.

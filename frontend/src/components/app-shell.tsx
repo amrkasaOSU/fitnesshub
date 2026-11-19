@@ -79,7 +79,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Dumbbell className="h-5 w-5 text-primary" />
           <span className="text-lg font-bold tracking-tight">FitnessHub</span>
         </div>
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-1 p-3" aria-label="Main">
           {nav.map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
@@ -87,6 +87,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   active
@@ -94,7 +95,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4" aria-hidden="true" />
                 {item.label}
               </Link>
             );
@@ -118,17 +119,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             FitnessHub
           </Link>
           <div className="ml-auto flex items-center gap-4">
+            {/* Named by text rather than aria-label so the visible unread count
+                is part of the accessible name (WCAG 2.5.3, label in name). */}
             <Link href="/notifications" className="relative">
-              <Bell className="h-5 w-5 text-muted-foreground" />
+              <Bell className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+              <span className="sr-only">Notifications</span>
               {!!unreadCount && unreadCount > 0 && (
                 <Badge className="absolute -right-2 -top-2 h-4 min-w-4 justify-center rounded-full px-1 text-[10px]">
                   {unreadCount}
+                  <span className="sr-only"> unread</span>
                 </Badge>
               )}
             </Link>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2">
+                <button className="flex items-center gap-2" aria-label="Account menu">
                   <Avatar className="h-8 w-8">
                     <AvatarFallback>
                       {user ? `${user.firstName[0]}${user.lastName[0]}` : "?"}
@@ -153,7 +158,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="flex-1 p-4 pb-20 md:p-6 md:pb-6">{children}</main>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-10 flex border-t bg-background md:hidden">
+      <nav
+        className="fixed inset-x-0 bottom-0 z-10 flex border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+        aria-label="Primary"
+      >
         {mobileNav.map((item) => {
           const active = pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
@@ -161,12 +169,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 py-2 text-[10px] font-medium",
+                "flex min-h-12 flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium",
                 active ? "text-primary" : "text-muted-foreground"
               )}
             >
-              <Icon className="h-5 w-5" />
+              <Icon className="h-5 w-5" aria-hidden="true" />
               {item.label}
             </Link>
           );

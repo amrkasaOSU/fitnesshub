@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { QueryError } from "@/components/query-error";
 
 const SCORES = [
   ["Energy", "energyScore"],
@@ -31,7 +32,7 @@ export default function CoachCheckInsPage() {
   const queryClient = useQueryClient();
   const [replies, setReplies] = useState<Record<string, string>>({});
 
-  const { data: pending, isLoading } = useQuery({
+  const { data: pending, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["coach", "checkins"],
     queryFn: () => api.get<CheckInDto[]>("/api/coach/checkins"),
   });
@@ -57,6 +58,7 @@ export default function CoachCheckInsPage() {
     onError: (e) => toast.error(e.message),
   });
 
+  if (isError) return <QueryError error={error} onRetry={() => refetch()} what="check-ins" />;
   if (isLoading) return <Skeleton className="h-96" />;
 
   return (
@@ -94,7 +96,7 @@ export default function CoachCheckInsPage() {
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
               {SCORES.map(([label, key]) => (
                 <div key={key} className="text-center">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
                   <p className={`text-lg font-bold ${scoreTone(c[key])}`}>{c[key]}</p>
                 </div>
               ))}

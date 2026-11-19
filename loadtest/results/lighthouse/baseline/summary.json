@@ -2,12 +2,12 @@
   {
     "page": "landing",
     "path": "/",
-    "performance": 99,
+    "performance": 98,
     "accessibility": 100,
     "bestPractices": 100,
     "seo": 100,
-    "lcpMs": 2262,
-    "tbtMs": 18,
+    "lcpMs": 2468,
+    "tbtMs": 7,
     "cls": 0,
     "failedA11y": []
   },
@@ -18,8 +18,8 @@
     "accessibility": 100,
     "bestPractices": 100,
     "seo": 100,
-    "lcpMs": 2621,
-    "tbtMs": 8,
+    "lcpMs": 2619,
+    "tbtMs": 6,
     "cls": 0,
     "failedA11y": []
   },
@@ -30,85 +30,81 @@
     "accessibility": 100,
     "bestPractices": 100,
     "seo": 100,
-    "lcpMs": 2482,
-    "tbtMs": 11,
+    "lcpMs": 2470,
+    "tbtMs": 9,
     "cls": 0,
     "failedA11y": []
   },
   {
     "page": "client-dashboard",
     "path": "/dashboard",
-    "performance": 91,
-    "accessibility": 91,
-    "bestPractices": 93,
-    "seo": 100,
-    "lcpMs": 3423,
-    "tbtMs": 9,
+    "performance": 85,
+    "accessibility": 92,
+    "bestPractices": 100,
+    "seo": 90,
+    "lcpMs": 4311,
+    "tbtMs": 16,
     "cls": 0,
     "failedA11y": [
-      "color-contrast",
-      "link-name"
+      "aria-progressbar-name",
+      "color-contrast"
     ]
   },
   {
     "page": "workout-today",
     "path": "/workout/today",
-    "performance": 90,
-    "accessibility": 91,
-    "bestPractices": 93,
+    "performance": 91,
+    "accessibility": 95,
+    "bestPractices": 96,
     "seo": 100,
-    "lcpMs": 3581,
-    "tbtMs": 7,
-    "cls": 0,
+    "lcpMs": 3568,
+    "tbtMs": 8,
+    "cls": 0.011,
     "failedA11y": [
-      "color-contrast",
-      "link-name"
+      "color-contrast"
     ]
   },
   {
     "page": "progress",
     "path": "/progress",
     "performance": 87,
-    "accessibility": 84,
-    "bestPractices": 96,
+    "accessibility": 89,
+    "bestPractices": 100,
     "seo": 100,
-    "lcpMs": 4030,
-    "tbtMs": 24,
+    "lcpMs": 4036,
+    "tbtMs": 10,
     "cls": 0,
     "failedA11y": [
       "button-name",
-      "color-contrast",
-      "link-name"
+      "color-contrast"
     ]
   },
   {
     "page": "coach-dashboard",
     "path": "/coach/dashboard",
-    "performance": 90,
-    "accessibility": 91,
-    "bestPractices": 93,
+    "performance": 86,
+    "accessibility": 96,
+    "bestPractices": 100,
     "seo": 100,
-    "lcpMs": 3551,
-    "tbtMs": 56,
+    "lcpMs": 4306,
+    "tbtMs": 9,
     "cls": 0,
     "failedA11y": [
-      "color-contrast",
-      "link-name"
+      "color-contrast"
     ]
   },
   {
     "page": "coach-clients",
     "path": "/coach/clients",
-    "performance": 85,
-    "accessibility": 91,
-    "bestPractices": 96,
+    "performance": 89,
+    "accessibility": 96,
+    "bestPractices": 100,
     "seo": 100,
-    "lcpMs": 4421,
-    "tbtMs": 12,
+    "lcpMs": 3829,
+    "tbtMs": 11,
     "cls": 0,
     "failedA11y": [
-      "color-contrast",
-      "link-name"
+      "color-contrast"
     ]
   }
 ]

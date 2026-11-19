@@ -11,12 +11,17 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { QueryError } from "@/components/query-error";
 
 export default function DashboardPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["dashboard", "client"],
     queryFn: () => api.get<ClientDashboardDto>("/api/dashboard"),
   });
+
+  if (isError) {
+    return <QueryError error={error} onRetry={() => refetch()} what="your dashboard" />;
+  }
 
   if (isLoading || !data) {
     return (
@@ -92,7 +97,7 @@ export default function DashboardPage() {
               </div>
               <Button asChild>
                 <Link href="/workout/today">
-                  {todaysWorkout.status === "COMPLETED" ? "View" : "Start"}
+                  {todaysWorkout.status === "COMPLETED" ? "View workout" : "Start workout"}
                 </Link>
               </Button>
             </div>
@@ -114,6 +119,7 @@ export default function DashboardPage() {
                 </p>
                 <Progress
                   className="mt-3"
+                  aria-label="Weekly adherence"
                   value={Math.min(100, weeklyAdherence.adherencePercentage ?? 0)}
                 />
               </>
@@ -166,7 +172,11 @@ export default function DashboardPage() {
                         {goal.currentValue} / {goal.targetValue} {goal.unit}
                       </span>
                     </div>
-                    <Progress className="mt-1" value={goal.percentComplete ?? 0} />
+                    <Progress
+                      className="mt-1"
+                      value={Math.min(100, Math.max(0, goal.percentComplete ?? 0))}
+                      aria-label={`${goal.name} progress`}
+                    />
                   </li>
                 ))}
               </ul>

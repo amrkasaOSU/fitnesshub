@@ -62,22 +62,34 @@ export function WeekStrip() {
               className={cn(
                 "flex min-h-24 flex-col items-center gap-1 rounded-md border p-1.5 text-center",
                 day.today && "border-primary bg-primary/5",
-                !day.today && day.past && "opacity-60",
+                // Past days are set apart by a dashed border, not opacity: fading
+                // the whole cell took its grey labels to 2.58:1 contrast.
+                !day.today && day.past && "border-dashed",
                 day.restDay && !day.today && "bg-muted/40"
               )}
             >
-              <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {LABELS[day.dayOfWeek] ?? day.dayOfWeek.slice(0, 3)}
               </span>
               <span className={cn("text-sm font-semibold leading-none", day.today && "text-primary")}>
                 {dayNumber(day.date)}
               </span>
-              <span className="line-clamp-2 text-[10px] leading-tight text-muted-foreground">
+              <span className="line-clamp-2 text-xs leading-tight text-muted-foreground">
                 {day.restDay ? "Rest" : (day.programDayName ?? "—")}
               </span>
               <div className="mt-auto h-4">
-                {day.status === "COMPLETED" && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
-                {day.status === "SKIPPED" && <SkipForward className="h-4 w-4 text-amber-500" />}
+                {day.status === "COMPLETED" && (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                    <span className="sr-only">Completed</span>
+                  </>
+                )}
+                {day.status === "SKIPPED" && (
+                  <>
+                    <SkipForward className="h-4 w-4 text-amber-600" aria-hidden="true" />
+                    <span className="sr-only">Skipped</span>
+                  </>
+                )}
               </div>
             </div>
           ))}
