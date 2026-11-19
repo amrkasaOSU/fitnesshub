@@ -19,6 +19,15 @@ jobs:
           cache: maven
           cache-dependency-path: backend/pom.xml
 
+      # setup-java caches dependencies but not the Maven distribution the
+      # wrapper downloads, so every run fetched it from Maven Central - and
+      # one run failed when Central answered HTTP 429.
+      - name: Cache Maven wrapper
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/wrapper
+          key: maven-wrapper-${{ hashFiles('backend/.mvn/wrapper/maven-wrapper.properties') }}
+
       # `verify` runs the unit tests (surefire) and then the *IT integration
       # tests (failsafe). The integration tests start their own PostgreSQL and
       # Redis with Testcontainers, using the runner's Docker daemon, so this job
