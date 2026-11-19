@@ -7,13 +7,18 @@ import type { WorkoutSessionDto } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/query-error";
 
 export default function WorkoutDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const { data: session, isLoading } = useQuery({
+  const { data: session, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["workout", id],
     queryFn: () => api.get<WorkoutSessionDto>(`/api/workouts/${id}`),
   });
+
+  if (isError) {
+    return <QueryError error={error} onRetry={() => refetch()} what="this workout" />;
+  }
 
   if (isLoading || !session) {
     return (

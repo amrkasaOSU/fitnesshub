@@ -9,12 +9,17 @@ import { StatCard } from "@/components/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/query-error";
 
 export default function CoachDashboardPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["dashboard", "coach"],
     queryFn: () => api.get<CoachDashboardDto>("/api/coach/dashboard"),
   });
+
+  if (isError) {
+    return <QueryError error={error} onRetry={() => refetch()} what="the dashboard" />;
+  }
 
   if (isLoading || !data) {
     return (

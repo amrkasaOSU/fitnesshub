@@ -6,6 +6,7 @@ import com.fitnesshub.program.ClientProgramRepository;
 import com.fitnesshub.program.ClientProgramStatus;
 import com.fitnesshub.program.ProgramDay;
 import com.fitnesshub.program.ProgramDayRepository;
+import com.fitnesshub.program.ProgramExercise;
 import com.fitnesshub.program.ProgramExerciseRepository;
 import com.fitnesshub.workout.WorkoutSessionRepository;
 import com.fitnesshub.workout.WorkoutSessionStatus;
@@ -20,7 +21,9 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Adherence = completed workouts / workouts the active program actually
@@ -91,11 +94,40 @@ public class AdherenceService {
             return AdherenceResult.noActiveProgram(completed);
         }
         ClientProgram active = activeOpt.get();
-        List<ProgramDay> days = programDayRepository.findByProgramIdOrderByDayNumberAsc(active.getProgramId());
-        List<Boolean> cycle = days.stream()
-                .map(day -> !programExerciseRepository.findByProgramDayIdOrderByOrderIndexAsc(day.getId()).isEmpty())
-                .toList();
+        return calculate(active.getStartDate(), cycleFor(active.getProgramId()), from, to, completed);
+    }
 
-        return calculate(active.getStartDate(), cycle, from, to, completed);
+    /**
+     * Which days of a program's cycle prescribe work, in day-number order.
+     * Two queries for the whole program rather than one per day.
+     */
+    private List<Boolean> cycleFor(UUID programId) {
+        List<ProgramDay> days = programDayRepository.findByProgramIdOrderByDayNumberAsc(programId);
+        if (days.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> daysWithExercises = programExerciseRepository
+                .findByProgramDayIdInOrderByOrderIndexAsc(days.stream().map(ProgramDay::getId).toList())
+                .stream().map(ProgramExercise::getProgramDayId).collect(Collectors.toSet());
+        return days.stream().map(day -> daysWithExercises.contains(day.getId())).toList();
+    }
+
+    /**
+     * The same calculation as {@link #calculateForClient}, from rows already
+     * loaded into a {@link ClientSnapshot}. The window must fall inside the
+     * snapshot's session lookback (the last week, which is all the roster
+     * needs); it is not a general-purpose date range.
+     */
+    public AdherenceResult calculateFromSnapshot(ClientSnapshot snapshot, LocalDate from, LocalDate to, ZoneId zone) {
+        Instant windowStart = from.atStartOfDay(zone).toInstant();
+        Instant windowEnd = to.plusDays(1).atStartOfDay(zone).toInstant();
+        int completed = (int) snapshot.recentSessions().stream()
+                .filter(s -> s.getStatus() == WorkoutSessionStatus.COMPLETED)
+                .filter(s -> !s.getStartedAt().isBefore(windowStart) && !s.getStartedAt().isAfter(windowEnd))
+                .count();
+        if (snapshot.activeProgram() == null) {
+            return AdherenceResult.noActiveProgram(completed);
+        }
+        return calculate(snapshot.activeProgram().getStartDate(), snapshot.programCycle(), from, to, completed);
     }
 }

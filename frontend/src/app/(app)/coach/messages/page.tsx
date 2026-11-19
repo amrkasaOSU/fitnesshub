@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Send } from "lucide-react";
+import { Send, ArrowLeft } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type { ConversationDto, MessageDto, PageResponse } from "@/lib/types";
 import { useCurrentUser } from "@/lib/use-auth";
@@ -55,14 +55,23 @@ export default function CoachMessagesPage() {
   }, [ordered.length]);
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] gap-4">
-      <Card className="w-72 shrink-0 overflow-y-auto">
+    // Phones get list-then-thread: a fixed-width list beside the thread left the
+    // thread about 40px wide. Until the coach picks someone, a phone shows the
+    // list; from md up both panes sit side by side as before.
+    <div className="flex h-[calc(100dvh-9rem)] gap-4 md:h-[calc(100vh-8rem)]">
+      <Card
+        className={cn(
+          "w-full shrink-0 overflow-y-auto md:block md:w-72",
+          explicitClientId ? "hidden" : "block"
+        )}
+      >
         <CardContent className="space-y-1 p-2">
           {loadingConvos && <Skeleton className="h-40" />}
           {conversations?.map((c) => (
             <button
               key={c.id}
               onClick={() => setSelectedClientId(c.clientId)}
+              aria-current={selectedClientId === c.clientId ? "true" : undefined}
               className={cn(
                 "flex w-full flex-col items-start rounded-md p-2 text-left text-sm transition-colors",
                 selectedClientId === c.clientId ? "bg-primary text-primary-foreground" : "hover:bg-muted"
@@ -80,7 +89,15 @@ export default function CoachMessagesPage() {
         </CardContent>
       </Card>
 
-      <Card className="flex flex-1 flex-col overflow-hidden">
+      <Card className={cn("min-w-0 flex-1 flex-col overflow-hidden md:flex", explicitClientId ? "flex" : "hidden")}>
+        <div className="flex items-center gap-2 border-b p-2 md:hidden">
+          <Button variant="ghost" size="sm" onClick={() => setSelectedClientId(null)}>
+            <ArrowLeft className="mr-1 h-4 w-4" aria-hidden="true" /> All conversations
+          </Button>
+          <span className="truncate text-sm font-medium">
+            {conversations?.find((c) => c.clientId === selectedClientId)?.otherPartyName}
+          </span>
+        </div>
         <CardContent className="flex-1 space-y-3 overflow-y-auto p-4">
           {ordered.map((m) => {
             const isMine = m.senderId === user?.id;
@@ -105,6 +122,7 @@ export default function CoachMessagesPage() {
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Type a message..."
             className="min-h-10 resize-none"
+            aria-label="Message"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -114,10 +132,11 @@ export default function CoachMessagesPage() {
           />
           <Button
             size="icon"
+            aria-label="Send message"
             disabled={!draft.trim() || !selectedClientId || send.isPending}
             onClick={() => send.mutate(draft.trim())}
           >
-            <Send className="h-4 w-4" />
+            <Send className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
       </Card>

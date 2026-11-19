@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/query-error";
 import {
   Table,
   TableBody,
@@ -22,7 +23,7 @@ import {
 
 export default function CoachClientsPage() {
   const [search, setSearch] = useState("");
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["coach", "clients"],
     queryFn: () => api.get<ClientSummaryDto[]>("/api/clients"),
   });
@@ -41,10 +42,11 @@ export default function CoachClientsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight">Clients</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <Input
             placeholder="Search by name, email, or goal..."
-            className="w-72"
+            aria-label="Search clients"
+            className="min-w-0 flex-1 sm:w-72 sm:flex-none"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -53,8 +55,9 @@ export default function CoachClientsPage() {
       </div>
 
       {isLoading && <Skeleton className="h-96" />}
+      {isError && <QueryError error={error} onRetry={() => refetch()} what="your clients" />}
 
-      {!isLoading && (data ?? []).length === 0 && (
+      {!isLoading && !isError && (data ?? []).length === 0 && (
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <Users className="h-8 w-8 text-muted-foreground" />
@@ -69,7 +72,7 @@ export default function CoachClientsPage() {
         </Card>
       )}
 
-      {!isLoading && (data ?? []).length > 0 && (
+      {!isLoading && !isError && (data ?? []).length > 0 && (
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">

@@ -1,0 +1,78 @@
+
+
+  █ THRESHOLDS 
+
+    http_req_duration{endpoint:client_dashboard}
+    ✓ 'max>=0' max=94.74ms
+
+    http_req_duration{endpoint:coach_client_workouts}
+    ✓ 'max>=0' max=68.51ms
+
+    http_req_duration{endpoint:coach_clients}
+    ✓ 'max>=0' max=82.44ms
+
+    http_req_duration{endpoint:coach_dashboard}
+    ✓ 'max>=0' max=86.38ms
+
+    http_req_duration{endpoint:exercises}
+    ✓ 'max>=0' max=42.39ms
+
+    http_req_duration{endpoint:weight_dashboard}
+    ✓ 'max>=0' max=67.6ms
+
+    http_req_duration{endpoint:workout_history}
+    ✓ 'max>=0' max=65.61ms
+
+    http_req_duration{endpoint:workout_today}
+    ✓ 'max>=0' max=87.61ms
+
+    http_req_duration{endpoint:workout_week}
+    ✓ 'max>=0' max=81.01ms
+
+    http_req_duration{scenario:steady}
+    ✓ 'max>=0' max=94.74ms
+
+    http_reqs{scenario:steady}
+    ✓ 'count>=0' count=18071
+
+
+  █ TOTAL RESULTS 
+
+    checks_total.......: 18071   209.458699/s
+    checks_succeeded...: 100.00% 18071 out of 18071
+    checks_failed......: 0.00%   0 out of 18071
+
+    ✓ status 200
+
+    CUSTOM
+    app_errors.............................: 0.00%  0 out of 18071
+
+    HTTP
+    http_req_duration......................: avg=7.1ms   min=1.05ms med=5.03ms p(90)=13.63ms p(95)=19.19ms p(99)=36.15ms max=265.62ms
+      { endpoint:client_dashboard }........: avg=12.07ms min=3.98ms med=8.88ms p(90)=22.46ms p(95)=31.46ms p(99)=50.39ms max=94.74ms 
+      { endpoint:coach_client_workouts }...: avg=6ms     min=1.75ms med=4.24ms p(90)=10.55ms p(95)=15.62ms p(99)=28ms    max=68.51ms 
+      { endpoint:coach_clients }...........: avg=9.06ms  min=3.81ms med=6.96ms p(90)=14.87ms p(95)=20.3ms  p(99)=35.69ms max=82.44ms 
+      { endpoint:coach_dashboard }.........: avg=10.34ms min=4.16ms med=7.69ms p(90)=18.25ms p(95)=23.76ms p(99)=53.81ms max=86.38ms 
+      { endpoint:exercises }...............: avg=4.4ms   min=1.05ms med=3.01ms p(90)=9.1ms   p(95)=11.92ms p(99)=21.78ms max=42.39ms 
+      { endpoint:weight_dashboard }........: avg=5ms     min=1.4ms  med=3.43ms p(90)=9.68ms  p(95)=13.81ms p(99)=25.23ms max=67.6ms  
+      { endpoint:workout_history }.........: avg=6.39ms  min=1.58ms med=4.52ms p(90)=12.41ms p(95)=17.56ms p(99)=33.38ms max=65.61ms 
+      { endpoint:workout_today }...........: avg=6.5ms   min=1.76ms med=4.5ms  p(90)=11.96ms p(95)=17.55ms p(99)=32.76ms max=87.61ms 
+      { endpoint:workout_week }............: avg=5.67ms  min=1.7ms  med=3.89ms p(90)=10.67ms p(95)=15.92ms p(99)=31.13ms max=81.01ms 
+      { expected_response:true }...........: avg=7.1ms   min=1.05ms med=5.03ms p(90)=13.63ms p(95)=19.19ms p(99)=36.15ms max=265.62ms
+      { scenario:steady }..................: avg=7.02ms  min=1.05ms med=5.03ms p(90)=13.6ms  p(95)=19.15ms p(99)=35.63ms max=94.74ms 
+    http_req_failed........................: 0.00%  0 out of 18082
+    http_reqs..............................: 18082  209.586198/s
+      { scenario:steady }..................: 18071  209.458699/s
+
+    EXECUTION
+    iteration_duration.....................: avg=5.04s   min=3.01s  med=6.02s  p(90)=6.06s   p(95)=6.09s   p(99)=6.11s   max=6.16s   
+    iterations.............................: 3557   41.228742/s
+    vus....................................: 15     min=0          max=250
+    vus_max................................: 250    min=250        max=250
+
+    NETWORK
+    data_received..........................: 57 MB  665 kB/s
+    data_sent..............................: 3.5 MB 41 kB/s
+
+
+

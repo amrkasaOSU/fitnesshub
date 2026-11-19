@@ -105,7 +105,12 @@ function CreateAccountTab({ onCreated }: { onCreated: () => void }) {
 
   const create = useMutation<User, ApiError, FormValues>({
     mutationFn: (values) => api.post<User>("/api/coach/clients", values),
-    onSuccess: (user, values) => {
+    onSuccess: async (user, values) => {
+      // Cancel first: if the roster's initial load is still in flight it was
+      // sent before this client existed, and invalidateQueries would reuse
+      // that request instead of starting a new one - so the new client would
+      // not appear until the next refetch.
+      await queryClient.cancelQueries({ queryKey: ["coach", "clients"] });
       queryClient.invalidateQueries({ queryKey: ["coach", "clients"] });
       toast.success(`${user.firstName} added. Their temporary password is ${values.temporaryPassword}`, {
         duration: 10000,

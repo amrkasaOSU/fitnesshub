@@ -23,6 +23,17 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
             "order by w.startedAt desc")
     List<WorkoutSession> findCompletedForClient(@Param("clientId") UUID clientId);
 
+    List<WorkoutSession> findByClientIdInAndStartedAtGreaterThanEqual(List<UUID> clientIds, Instant since);
+
+    /** Each client's most recent completed session, one row per client. */
+    @Query(value = """
+            select distinct on (client_id) *
+            from workout_sessions
+            where client_id in (:clientIds) and status = 'COMPLETED'
+            order by client_id, started_at desc
+            """, nativeQuery = true)
+    List<WorkoutSession> findLatestCompletedPerClient(@Param("clientIds") List<UUID> clientIds);
+
     long countByClientIdAndStatusAndStartedAtBetween(UUID clientId, WorkoutSessionStatus status, Instant from, Instant to);
 
     /**

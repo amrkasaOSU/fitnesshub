@@ -117,7 +117,7 @@ export function CheckInForm() {
                   </button>
                 ))}
               </div>
-              <div className="flex justify-between text-[11px] text-muted-foreground">
+              <div className="flex justify-between text-xs text-muted-foreground">
                 <span>{s.low}</span>
                 <span>{s.high}</span>
               </div>

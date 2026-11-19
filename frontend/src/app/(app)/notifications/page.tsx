@@ -7,10 +7,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { QueryError } from "@/components/query-error";
 
 export default function NotificationsPage() {
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["notifications"],
     queryFn: () => api.get<PageResponse<NotificationDto>>("/api/notifications", { pageSize: 50 }),
   });
@@ -37,6 +38,7 @@ export default function NotificationsPage() {
         </Button>
       </div>
       {isLoading && <Skeleton className="h-64" />}
+      {isError && <QueryError error={error} onRetry={() => refetch()} what="notifications" />}
       <div className="space-y-2">
         {data?.data.map((n) => (
           <Card

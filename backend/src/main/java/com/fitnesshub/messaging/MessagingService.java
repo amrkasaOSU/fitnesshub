@@ -21,8 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 public class MessagingService {
@@ -126,17 +129,36 @@ public class MessagingService {
         }
     }
 
+    /**
+     * The coach's inbox. Four queries regardless of how many conversations
+     * there are or how long they run: the conversations, the clients' names,
+     * the newest message in each, and the unread count for each. It previously
+     * loaded every message of every conversation just to read the first one.
+     */
     @Transactional(readOnly = true)
     public List<ConversationDto> listConversationsForCoach(UUID coachId) {
-        return conversationRepository.findByCoachId(coachId).stream().map(conv -> {
-            User client = userRepository.findById(conv.getClientId()).orElse(null);
-            List<Message> messages = messageRepository.findByConversationIdOrderByCreatedAtDesc(conv.getId());
-            Message last = messages.isEmpty() ? null : messages.get(0);
-            long unread = messageRepository.countByConversationIdAndSenderIdNotAndReadAtIsNull(conv.getId(), coachId);
+        List<Conversation> conversations = conversationRepository.findByCoachId(coachId);
+        if (conversations.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> conversationIds = conversations.stream().map(Conversation::getId).toList();
+
+        Map<UUID, User> clients = userRepository
+                .findAllById(conversations.stream().map(Conversation::getClientId).toList())
+                .stream().collect(Collectors.toMap(User::getId, Function.identity()));
+        Map<UUID, Message> latest = messageRepository.findLatestPerConversation(conversationIds)
+                .stream().collect(Collectors.toMap(Message::getConversationId, Function.identity()));
+        Map<UUID, Long> unread = messageRepository.countUnreadPerConversation(conversationIds, coachId)
+                .stream().collect(Collectors.toMap(row -> (UUID) row[0], row -> (Long) row[1]));
+
+        return conversations.stream().map(conv -> {
+            User client = clients.get(conv.getClientId());
+            Message last = latest.get(conv.getId());
             return new ConversationDto(conv.getId(), conv.getCoachId(), conv.getClientId(),
                     client == null ? "Client" : client.getFirstName() + " " + client.getLastName(),
                     last == null ? null : truncate(last.getContent()),
-                    last == null ? null : last.getCreatedAt(), unread);
+                    last == null ? null : last.getCreatedAt(),
+                    unread.getOrDefault(conv.getId(), 0L));
         }).toList();
     }
 

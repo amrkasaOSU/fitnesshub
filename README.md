@@ -85,12 +85,47 @@ The decisions I'd want to talk through, each linked to where it lives:
   a client's gallery but cannot upload to or delete from it, and listing a
   gallery projects metadata only so image data is never loaded to render
   thumbnails.
-- **Verified against real infrastructure, not mocks.** Standing the stack up on
-  real PostgreSQL and Redis caught two bugs unit tests could not: Hibernate
-  reordering inserts so child rows were written before their parents, and a
-  missing `spring-boot-starter-actuator` dependency that only failed at
-  runtime. Write-up in
-  [docs/development.md](docs/development.md#verifying-without-docker).
+- **Tested against real infrastructure, not mocks.** 81 integration tests boot
+  the app against real PostgreSQL and Redis containers and attack it over
+  HTTP; run against the unchanged code first, they found five real bugs,
+  including session fixation. See [RESULTS.md](RESULTS.md#23-bugs-the-new-tests-found).
+- **Performance work driven by measurement.** The coach dashboard issued
+  67,801 SQL statements for a 200-client coach; batching per table and
+  pure-function analytics cut it to 18. When a load test seemed to show a
+  regression, an interleaved A/B traced it to CPU power management, not the
+  code. See [RESULTS.md](RESULTS.md#3-performance-n1-queries-indexes-caching).
+
+## Results
+
+Measured, not estimated. Every number below comes from a command that was run
+on a local Docker stack (Apple M4, Colima VM limited to 6 CPUs / 8 GB) and is
+reproducible from [RESULTS.md](RESULTS.md), which lists the exact command,
+raw output and caveats for each. These are test-environment measurements, not
+production traffic.
+
+| What | Before | After |
+|---|---:|---:|
+| Automated tests | 20 unit | **103 backend (22 unit + 81 integration on real PostgreSQL/Redis) + 17 Playwright E2E** |
+| Backend line coverage (JaCoCo) | 4.1% | **77.7%** |
+| Coach dashboard, coach with 200 clients - SQL statements per load | 67,801 | **18** |
+| Coach dashboard, coach with 200 clients - median response | 5,278 ms | **239 ms** (-95.5%) |
+| p95 latency, 500 concurrent users (k6, seeded data) | 46.5 ms | **13.8 ms** (-70.3%) |
+| p99 latency, 500 concurrent users | 124.9 ms | **24.6 ms** (-80.3%) |
+| Throughput ceiling (no think time, 100 VUs) | 1,072 req/s | **1,972 req/s** (+83.9%) |
+| Unread-notification query, 80k rows (EXPLAIN ANALYZE) | 2.025 ms | **0.054 ms** (index-only scan) |
+| Lighthouse accessibility, signed-in pages | 89-96 | **100** on every audited page |
+| AI assistant accuracy (25-question graded eval) | 28% (7/25) - context bug | **100% (25/25)** |
+| AI assistant latency, end to end | - | **p50 1037 ms, p95 3,024 ms** |
+
+**Bugs found by the new tests and measurements, all fixed:** session fixation
+on login; three `/api/clients/{id}/...` endpoints answering 200 for someone
+else's id; opening the app counted as "training today"; the dashboard handing
+out a workout id that was never saved; timezones never recorded, so "today"
+rolled over at 7 pm for a US client; the AI assistant sending the model an
+empty context (`{}`) for every question; progress bars invisible to screen
+readers; a newly added client missing from the roster; and, in the tooling
+itself, a Lighthouse setup that had been scoring signed-in pages whose data
+never loaded. Each is written up in RESULTS.md with how it was found.
 
 ## Quick start (Docker)
 
@@ -162,35 +197,44 @@ including how this was verified without Docker during initial development.
 
 ```bash
 cd backend
-./mvnw test          # unit tests (pure logic - no DB required)
-# Integration tests using Testcontainers require Docker; see docs/development.md.
+./mvnw test        # 22 unit tests - pure calculations, no database
+./mvnw verify      # + 81 integration tests on real PostgreSQL and Redis (Testcontainers, needs Docker)
 ```
 
 ```bash
-cd frontend
-npm run typecheck
-npm run lint
-npm run build
+docker compose -f loadtest/docker-compose.loadtest.yml --profile ui up -d --build
+loadtest/wait-ready.sh
+cd frontend && npm run e2e     # 17 Playwright tests, desktop + phone viewport
 ```
+
+The integration tests drive the real app over HTTP with real session cookies
+and CSRF, including 37 cross-tenant attack cases proving one client can't read
+or change another's data. All three layers run in GitHub Actions on every
+push. Load tests, query analysis, Lighthouse and the AI evaluation live in
+[`loadtest/`](loadtest/); see [docs/development.md](docs/development.md).
 
 ## Known limitations
 
 Stated plainly rather than buried:
 
-- **No integration or E2E test suite yet.** Unit tests cover the calculation
-  layer (1RM, volume, adherence, PR eligibility); Testcontainers and Playwright
-  suites are the next thing I'd add. The stack *has* been verified end to end
-  against real PostgreSQL and Redis - see
-  [docs/development.md](docs/development.md#verifying-without-docker) - but
-  that verification isn't automated.
-- **AI and paid plans are switched off.** `GET /api/features` reports whether
-  each integration is configured, and the UI renders a "coming soon" state
-  instead of a dead end. Add an `OPENAI_API_KEY` (or any OpenAI-compatible
-  endpoint via `OPENAI_BASE_URL`) or Stripe test keys and the features turn
-  themselves on - no frontend change needed. Everything else works without
-  either.
-- **No email delivery.** Email verification and password reset have their
-  schema fields but no sending integration.
+- **Not yet proven under real traffic.** Every performance number here comes
+  from a local test stack with seeded and synthetic data. The live free-tier
+  deployment has a fraction of that hardware and sleeps when idle, so its
+  first request after a quiet period takes about 50 seconds.
+- **The coach dashboard still does real work at scale.** For a coach with 200
+  clients it takes about 240 ms, most of it one query that finds each
+  client's last three sessions per exercise for the attention flags. The fix
+  is to maintain those as workouts are completed instead of computing them on
+  read (RESULTS.md, section 3.3).
+- **The AI evaluation is small and self-written.** 25 questions over five
+  demo clients, graded automatically. It catches grounding, safety and
+  regressions; it is not a benchmark of answer quality, and the free tier's
+  rate limits keep each run to a single pass.
+- **Paid plans are off.** Stripe sits behind the same "not configured"
+  abstraction as the AI; add test keys and it turns on without a frontend
+  change.
+- **No email delivery.** Password recovery runs through the coach, who can set
+  a temporary password; email verification has schema fields but no sender.
 
 ## Disclaimer
 

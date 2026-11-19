@@ -1,0 +1,98 @@
+[
+  {
+    "page": "landing",
+    "path": "/",
+    "performance": 98,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 2471,
+    "tbtMs": 10,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "login",
+    "path": "/login",
+    "performance": 97,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 2623,
+    "tbtMs": 7,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "pricing",
+    "path": "/pricing",
+    "performance": 98,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 2467,
+    "tbtMs": 7,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "client-dashboard",
+    "path": "/dashboard",
+    "performance": 90,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 3709,
+    "tbtMs": 7,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "workout-today",
+    "path": "/workout/today",
+    "performance": 89,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 3715,
+    "tbtMs": 6,
+    "cls": 0.012,
+    "failedA11y": []
+  },
+  {
+    "page": "progress",
+    "path": "/progress",
+    "performance": 87,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 4072,
+    "tbtMs": 14,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "coach-dashboard",
+    "path": "/coach/dashboard",
+    "performance": 85,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 4315,
+    "tbtMs": 8,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "coach-clients",
+    "path": "/coach/clients",
+    "performance": 89,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 3844,
+    "tbtMs": 5,
+    "cls": 0,
+    "failedA11y": []
+  }
+]

@@ -15,6 +15,7 @@ import { RestTimer } from "@/components/rest-timer";
 import { WeekStrip } from "@/components/week-strip";
 import { SkipWorkoutDialog } from "@/components/skip-workout-dialog";
 import { usePendingSetQueue } from "@/lib/use-pending-set-queue";
+import { QueryError } from "@/components/query-error";
 
 interface SetInput {
   weight: string;
@@ -24,7 +25,7 @@ interface SetInput {
 
 export default function TodayWorkoutPage() {
   const queryClient = useQueryClient();
-  const { data: session, isLoading } = useQuery({
+  const { data: session, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["workout", "today"],
     queryFn: () => api.get<WorkoutSessionDto>("/api/workouts/today"),
   });
@@ -91,6 +92,10 @@ export default function TodayWorkoutPage() {
     const done = session.exercises.filter((e) => e.completedSets.length > 0).length;
     return { done, total };
   }, [session]);
+
+  if (isError) {
+    return <QueryError error={error} onRetry={() => refetch()} what="today's workout" />;
+  }
 
   if (isLoading || !session) {
     return (
@@ -227,6 +232,7 @@ export default function TodayWorkoutPage() {
                   <Input
                     inputMode="decimal"
                     placeholder="Weight"
+                    aria-label={`${exercise.exerciseName} weight`}
                     className="h-12 text-center text-lg"
                     value={input.weight}
                     onChange={(e) => setInputs((p) => ({ ...p, [key]: { ...input, weight: e.target.value } }))}
@@ -234,6 +240,7 @@ export default function TodayWorkoutPage() {
                   <Input
                     inputMode="numeric"
                     placeholder="Reps"
+                    aria-label={`${exercise.exerciseName} reps`}
                     className="h-12 text-center text-lg"
                     value={input.reps}
                     onChange={(e) => setInputs((p) => ({ ...p, [key]: { ...input, reps: e.target.value } }))}
@@ -241,6 +248,7 @@ export default function TodayWorkoutPage() {
                   <Input
                     inputMode="decimal"
                     placeholder="RPE"
+                    aria-label={`${exercise.exerciseName} RPE`}
                     className="h-12 text-center text-lg"
                     value={input.rpe}
                     onChange={(e) => setInputs((p) => ({ ...p, [key]: { ...input, rpe: e.target.value } }))}
@@ -261,7 +269,7 @@ export default function TodayWorkoutPage() {
                     })
                   }
                 >
-                  Complete Set
+                  Complete Set<span className="sr-only"> for {exercise.exerciseName}</span>
                 </Button>
               )}
             </CardContent>

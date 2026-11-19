@@ -1,0 +1,268 @@
+-- 2026-11-17T06:43:16Z  rows: 791348 sets, 49455 sessions, 80384 notifications
+
+-- 1. Unread notification badge (polled every 30 s per open tab)
+                                                                    QUERY PLAN                                                                    
+--------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=1892.13..1892.14 rows=1 width=8) (actual time=1.994..1.997 rows=1 loops=1)
+   Buffers: shared hit=381
+   ->  Bitmap Heap Scan on notifications  (cost=234.70..1891.22 rows=364 width=0) (actual time=0.228..1.992 rows=40 loops=1)
+         Recheck Cond: (user_id = '9e12bbdc-6619-4c43-b965-b212f0c20de3'::uuid)
+         Filter: (read_at IS NULL)
+         Rows Removed by Filter: 19960
+         Heap Blocks: exact=364
+         Buffers: shared hit=381
+         ->  Bitmap Index Scan on idx_notifications_user_id  (cost=0.00..234.61 rows=20042 width=0) (actual time=0.198..0.200 rows=20000 loops=1)
+               Index Cond: (user_id = '9e12bbdc-6619-4c43-b965-b212f0c20de3'::uuid)
+               Buffers: shared hit=17
+ Planning:
+   Buffers: shared hit=112
+ Planning Time: 0.255 ms
+ Execution Time: 2.025 ms
+(15 rows)
+
+
+-- 2. Newest notifications page
+                                                                       QUERY PLAN                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2429.45..2429.50 rows=20 width=134) (actual time=2.016..2.019 rows=20 loops=1)
+   Buffers: shared hit=384
+   ->  Sort  (cost=2429.45..2479.56 rows=20042 width=134) (actual time=2.016..2.017 rows=20 loops=1)
+         Sort Key: created_at DESC
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=384
+         ->  Bitmap Heap Scan on notifications  (cost=239.62..1896.14 rows=20042 width=134) (actual time=0.200..1.089 rows=20000 loops=1)
+               Recheck Cond: (user_id = '9e12bbdc-6619-4c43-b965-b212f0c20de3'::uuid)
+               Heap Blocks: exact=364
+               Buffers: shared hit=381
+               ->  Bitmap Index Scan on idx_notifications_user_id  (cost=0.00..234.61 rows=20042 width=0) (actual time=0.179..0.180 rows=20000 loops=1)
+                     Index Cond: (user_id = '9e12bbdc-6619-4c43-b965-b212f0c20de3'::uuid)
+                     Buffers: shared hit=17
+ Planning:
+   Buffers: shared hit=140 read=3
+   I/O Timings: shared read=0.075
+ Planning Time: 0.385 ms
+ Execution Time: 2.048 ms
+(18 rows)
+
+
+-- 3. A client's sessions in the last 7 days (dashboards, adherence, flags)
+                                                                       QUERY PLAN                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on workout_sessions  (cost=35.62..66.14 rows=8 width=174) (actual time=0.063..0.071 rows=6 loops=1)
+   Recheck Cond: ((client_id = '4b074eeb-b391-4ec0-bc4a-7a3c661324b9'::uuid) AND (started_at >= (now() - '7 days'::interval)) AND (started_at <= now()))
+   Heap Blocks: exact=4
+   Buffers: shared hit=10
+   ->  BitmapAnd  (cost=35.62..35.62 rows=8 width=0) (actual time=0.062..0.063 rows=0 loops=1)
+         Buffers: shared hit=6
+         ->  Bitmap Index Scan on idx_workout_sessions_client_id  (cost=0.00..7.00 rows=361 width=0) (actual time=0.009..0.009 rows=239 loops=1)
+               Index Cond: (client_id = '4b074eeb-b391-4ec0-bc4a-7a3c661324b9'::uuid)
+               Buffers: shared hit=2
+         ->  Bitmap Index Scan on idx_workout_sessions_started_at  (cost=0.00..28.37 rows=1607 width=0) (actual time=0.049..0.049 rows=877 loops=1)
+               Index Cond: ((started_at >= (now() - '7 days'::interval)) AND (started_at <= now()))
+               Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=181
+ Planning Time: 0.392 ms
+ Execution Time: 0.105 ms
+(16 rows)
+
+
+-- 4. Workout history page, newest first
+                                                                               QUERY PLAN                                                                                
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.29..459.53 rows=20 width=174) (actual time=0.010..2.011 rows=20 loops=1)
+   Buffers: shared hit=3524
+   ->  Index Scan Backward using idx_workout_sessions_started_at on workout_sessions  (cost=0.29..8289.60 rows=361 width=174) (actual time=0.009..2.008 rows=20 loops=1)
+         Filter: (client_id = '4b074eeb-b391-4ec0-bc4a-7a3c661324b9'::uuid)
+         Rows Removed by Filter: 3503
+         Buffers: shared hit=3524
+ Planning:
+   Buffers: shared hit=172
+ Planning Time: 0.316 ms
+ Execution Time: 2.031 ms
+(10 rows)
+
+
+-- 5. Latest completed session per client, whole roster
+                                                                                   QUERY PLAN                                                                                   
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Unique  (cost=60.59..13335.29 rows=204 width=174) (actual time=0.137..19.689 rows=200 loops=1)
+   Buffers: shared hit=1249 read=3
+   I/O Timings: shared read=0.028
+   ->  Incremental Sort  (cost=60.59..13154.47 rows=72326 width=174) (actual time=0.137..18.108 rows=49394 loops=1)
+         Sort Key: workout_sessions.client_id, workout_sessions.started_at DESC
+         Presorted Key: workout_sessions.client_id
+         Full-sort Groups: 200  Sort Method: quicksort  Average Memory: 33kB  Peak Memory: 33kB
+         Pre-sorted Groups: 200  Sort Method: quicksort  Average Memory: 54kB  Peak Memory: 54kB
+         Buffers: shared hit=1249 read=3
+         I/O Timings: shared read=0.028
+         ->  Merge Join  (cost=0.56..9183.38 rows=72326 width=174) (actual time=0.031..9.004 rows=49394 loops=1)
+               Merge Cond: (workout_sessions.client_id = coach_clients.client_id)
+               Buffers: shared hit=1246 read=3
+               I/O Timings: shared read=0.028
+               ->  Index Scan using idx_workout_sessions_client_id on workout_sessions  (cost=0.29..8231.58 rows=74134 width=174) (actual time=0.006..5.161 rows=49451 loops=1)
+                     Filter: ((status)::text = 'COMPLETED'::text)
+                     Rows Removed by Filter: 4
+                     Buffers: shared hit=1112
+               ->  Index Only Scan using uq_coach_clients on coach_clients  (cost=0.27..42.71 rows=200 width=16) (actual time=0.024..0.092 rows=200 loops=1)
+                     Index Cond: (coach_id = '9e12bbdc-6619-4c43-b965-b212f0c20de3'::uuid)
+                     Heap Fetches: 200
+                     Buffers: shared hit=134 read=3
+                     I/O Timings: shared read=0.028
+ Planning:
+   Buffers: shared hit=270 read=2
+   I/O Timings: shared read=0.033
+ Planning Time: 0.645 ms
+ Execution Time: 19.737 ms
+(28 rows)
+
+
+-- 6. A client's weigh-ins in the last 23 days
+                                                                        QUERY PLAN                                                                        
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=168.52..168.58 rows=24 width=94) (actual time=0.251..0.253 rows=23 loops=1)
+   Sort Key: recorded_at
+   Sort Method: quicksort  Memory: 26kB
+   Buffers: shared hit=28 read=10
+   I/O Timings: shared read=0.118
+   ->  Bitmap Heap Scan on weight_entries  (cost=80.14..167.97 rows=24 width=94) (actual time=0.210..0.241 rows=23 loops=1)
+         Recheck Cond: ((client_id = '4b074eeb-b391-4ec0-bc4a-7a3c661324b9'::uuid) AND (recorded_at >= (now() - '23 days'::interval)))
+         Heap Blocks: exact=23
+         Buffers: shared hit=25 read=10
+         I/O Timings: shared read=0.118
+         ->  BitmapAnd  (cost=80.14..80.14 rows=24 width=0) (actual time=0.203..0.205 rows=0 loops=1)
+               Buffers: shared hit=2 read=10
+               I/O Timings: shared read=0.118
+               ->  Bitmap Index Scan on idx_weight_entries_client_id  (cost=0.00..6.94 rows=353 width=0) (actual time=0.022..0.022 rows=365 loops=1)
+                     Index Cond: (client_id = '4b074eeb-b391-4ec0-bc4a-7a3c661324b9'::uuid)
+                     Buffers: shared hit=2
+               ->  Bitmap Index Scan on idx_weight_entries_recorded_at  (cost=0.00..72.94 rows=4886 width=0) (actual time=0.172..0.172 rows=4648 loops=1)
+                     Index Cond: (recorded_at >= (now() - '23 days'::interval))
+                     Buffers: shared read=10
+                     I/O Timings: shared read=0.118
+ Planning:
+   Buffers: shared hit=154
+ Planning Time: 0.346 ms
+ Execution Time: 0.283 ms
+(24 rows)
+
+
+-- 7. Latest weigh-in per client, whole roster
+                                                              QUERY PLAN                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ Unique  (cost=12001.13..12357.56 rows=205 width=94) (actual time=49.044..54.920 rows=200 loops=1)
+   Buffers: shared hit=843 read=829, temp read=661 written=662
+   I/O Timings: shared read=5.470, temp read=0.267 write=3.259
+   ->  Sort  (cost=12001.13..12179.35 rows=71286 width=94) (actual time=49.043..52.676 rows=73000 loops=1)
+         Sort Key: weight_entries.client_id, weight_entries.recorded_at DESC
+         Sort Method: external merge  Disk: 5288kB
+         Buffers: shared hit=843 read=829, temp read=661 written=662
+         I/O Timings: shared read=5.470, temp read=0.267 write=3.259
+         ->  Hash Join  (cost=11.06..2597.51 rows=71286 width=94) (actual time=6.046..15.113 rows=73000 loops=1)
+               Hash Cond: (weight_entries.client_id = coach_clients.client_id)
+               Buffers: shared hit=837 read=829
+               I/O Timings: shared read=5.470
+               ->  Seq Scan on weight_entries  (cost=0.00..2390.68 rows=73068 width=94) (actual time=0.005..8.475 rows=73068 loops=1)
+                     Buffers: shared hit=831 read=829
+                     I/O Timings: shared read=5.470
+               ->  Hash  (cost=8.56..8.56 rows=200 width=16) (actual time=0.033..0.034 rows=200 loops=1)
+                     Buckets: 1024  Batches: 1  Memory Usage: 18kB
+                     Buffers: shared hit=6
+                     ->  Seq Scan on coach_clients  (cost=0.00..8.56 rows=200 width=16) (actual time=0.008..0.022 rows=200 loops=1)
+                           Filter: (coach_id = '9e12bbdc-6619-4c43-b965-b212f0c20de3'::uuid)
+                           Rows Removed by Filter: 5
+                           Buffers: shared hit=6
+ Planning:
+   Buffers: shared hit=242 read=1
+   I/O Timings: shared read=0.042
+ Planning Time: 0.601 ms
+ Execution Time: 55.184 ms
+(27 rows)
+
+
+-- 8. A client's recent personal records
+                                                                     QUERY PLAN                                                                      
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=47.61..47.63 rows=5 width=104) (actual time=0.080..0.081 rows=5 loops=1)
+   Buffers: shared hit=19
+   ->  Sort  (cost=47.61..47.65 rows=16 width=104) (actual time=0.079..0.080 rows=5 loops=1)
+         Sort Key: achieved_at DESC
+         Sort Method: top-N heapsort  Memory: 26kB
+         Buffers: shared hit=19
+         ->  Bitmap Heap Scan on personal_records  (cost=4.40..47.35 rows=16 width=104) (actual time=0.025..0.065 rows=16 loops=1)
+               Recheck Cond: (client_id = '4b074eeb-b391-4ec0-bc4a-7a3c661324b9'::uuid)
+               Heap Blocks: exact=14
+               Buffers: shared hit=16
+               ->  Bitmap Index Scan on idx_personal_records_client_id  (cost=0.00..4.40 rows=16 width=0) (actual time=0.013..0.014 rows=16 loops=1)
+                     Index Cond: (client_id = '4b074eeb-b391-4ec0-bc4a-7a3c661324b9'::uuid)
+                     Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=182
+ Planning Time: 0.413 ms
+ Execution Time: 0.117 ms
+(17 rows)
+
+
+-- 9. Newest message in a conversation
+                                                                    QUERY PLAN                                                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=164.35..164.36 rows=1 width=89) (actual time=0.198..0.200 rows=1 loops=1)
+   Buffers: shared hit=65
+   ->  Sort  (cost=164.35..164.50 rows=60 width=89) (actual time=0.198..0.199 rows=1 loops=1)
+         Sort Key: created_at DESC
+         Sort Method: top-N heapsort  Memory: 25kB
+         Buffers: shared hit=65
+         ->  Bitmap Heap Scan on messages  (cost=4.75..164.05 rows=60 width=89) (actual time=0.027..0.170 rows=60 loops=1)
+               Recheck Cond: (conversation_id = '7978fb75-5bef-4fbe-b07d-52f9b4d63cbc'::uuid)
+               Heap Blocks: exact=60
+               Buffers: shared hit=62
+               ->  Bitmap Index Scan on idx_messages_conversation_id  (cost=0.00..4.74 rows=60 width=0) (actual time=0.015..0.016 rows=60 loops=1)
+                     Index Cond: (conversation_id = '7978fb75-5bef-4fbe-b07d-52f9b4d63cbc'::uuid)
+                     Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=136
+ Planning Time: 0.323 ms
+ Execution Time: 0.226 ms
+(17 rows)
+
+
+-- 10. Unread messages in a conversation
+                                                                 QUERY PLAN                                                                  
+---------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=164.19..164.20 rows=1 width=8) (actual time=0.062..0.063 rows=1 loops=1)
+   Buffers: shared hit=62
+   ->  Bitmap Heap Scan on messages  (cost=4.74..164.19 rows=1 width=0) (actual time=0.015..0.061 rows=1 loops=1)
+         Recheck Cond: (conversation_id = '7978fb75-5bef-4fbe-b07d-52f9b4d63cbc'::uuid)
+         Filter: ((read_at IS NULL) AND (sender_id <> '9e12bbdc-6619-4c43-b965-b212f0c20de3'::uuid))
+         Rows Removed by Filter: 59
+         Heap Blocks: exact=60
+         Buffers: shared hit=62
+         ->  Bitmap Index Scan on idx_messages_conversation_id  (cost=0.00..4.74 rows=60 width=0) (actual time=0.008..0.009 rows=60 loops=1)
+               Index Cond: (conversation_id = '7978fb75-5bef-4fbe-b07d-52f9b4d63cbc'::uuid)
+               Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=114
+ Planning Time: 0.298 ms
+ Execution Time: 0.090 ms
+(15 rows)
+
+
+-- 11. A client's active program assignment
+                                                                         QUERY PLAN                                                                         
+------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=8.30..8.30 rows=1 width=79) (actual time=0.021..0.022 rows=1 loops=1)
+   Buffers: shared hit=6
+   ->  Sort  (cost=8.30..8.30 rows=1 width=79) (actual time=0.020..0.021 rows=1 loops=1)
+         Sort Key: start_date DESC
+         Sort Method: quicksort  Memory: 25kB
+         Buffers: shared hit=6
+         ->  Index Scan using idx_client_programs_client_id on client_programs  (cost=0.27..8.29 rows=1 width=79) (actual time=0.009..0.010 rows=1 loops=1)
+               Index Cond: (client_id = '4b074eeb-b391-4ec0-bc4a-7a3c661324b9'::uuid)
+               Filter: ((status)::text = 'ACTIVE'::text)
+               Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=127
+ Planning Time: 0.253 ms
+ Execution Time: 0.041 ms
+(14 rows)
+

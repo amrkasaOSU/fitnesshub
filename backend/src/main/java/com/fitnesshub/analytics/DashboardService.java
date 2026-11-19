@@ -6,6 +6,7 @@ import com.fitnesshub.analytics.dto.CoachDashboardDto;
 import com.fitnesshub.bodyweight.WeightService;
 import com.fitnesshub.client.ClientProfileRepository;
 import com.fitnesshub.coach.CoachClient;
+import com.fitnesshub.coach.CoachClientStatus;
 import com.fitnesshub.coach.CoachClientService;
 import com.fitnesshub.coach.dto.ClientSummaryDto;
 import com.fitnesshub.goal.GoalRepository;
@@ -22,7 +23,6 @@ import com.fitnesshub.steps.StepService;
 import com.fitnesshub.user.User;
 import com.fitnesshub.user.UserRepository;
 import com.fitnesshub.workout.WorkoutService;
-import com.fitnesshub.workout.WorkoutSessionRepository;
 import com.fitnesshub.workout.WorkoutSessionStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,7 +54,6 @@ public class DashboardService {
     private final NotificationService notificationService;
     private final CoachClientService coachClientService;
     private final CheckInService checkInService;
-    private final WorkoutSessionRepository workoutSessionRepository;
     private final ClientProfileRepository clientProfileRepository;
 
     public DashboardService(CurrentUser currentUser, UserRepository userRepository, WorkoutService workoutService,
@@ -63,7 +62,7 @@ public class DashboardService {
                              GoalRepository goalRepository, GoalService goalService,
                              ConversationRepository conversationRepository, MessageRepository messageRepository,
                              NotificationService notificationService, CoachClientService coachClientService,
-                             CheckInService checkInService, WorkoutSessionRepository workoutSessionRepository,
+                             CheckInService checkInService,
                              ClientProfileRepository clientProfileRepository) {
         this.currentUser = currentUser;
         this.userRepository = userRepository;
@@ -80,11 +79,16 @@ public class DashboardService {
         this.notificationService = notificationService;
         this.coachClientService = coachClientService;
         this.checkInService = checkInService;
-        this.workoutSessionRepository = workoutSessionRepository;
         this.clientProfileRepository = clientProfileRepository;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Not read-only: the first dashboard load of the day creates today's
+     * workout session, exactly as {@code GET /api/workouts/today} does. Under
+     * a read-only transaction that insert was silently never flushed, so the
+     * dashboard handed back a session id that did not exist.
+     */
+    @Transactional
     public ClientDashboardDto clientDashboard() {
         UUID clientId = currentUser.id();
         User user = userRepository.findById(clientId).orElseThrow();
@@ -110,22 +114,33 @@ public class DashboardService {
                 unreadMessages, unreadNotifications);
     }
 
+    /**
+     * The coach's landing page. Costs a fixed number of queries however many
+     * clients the coach has: the roster comes from one batched snapshot load
+     * (see {@link ClientSnapshotLoader}) and each remaining figure is a single
+     * aggregate query rather than a loop over clients or conversations.
+     */
     @Transactional(readOnly = true)
     public CoachDashboardDto coachDashboard() {
         UUID coachId = currentUser.id();
-        int totalClients = coachClientService.allClients(coachId).size();
-        List<CoachClient> active = coachClientService.activeClients(coachId);
-        List<ClientSummaryDto> summaries = active.stream().map(cc -> coachClientService.summarize(cc.getClientId())).toList();
+        List<CoachClient> all = coachClientService.allClients(coachId);
+        List<UUID> activeIds = all.stream()
+                .filter(cc -> cc.getStatus() == CoachClientStatus.ACTIVE)
+                .map(CoachClient::getClientId)
+                .toList();
 
         Instant now = Instant.now();
-        int trainingToday = 0;
-        for (CoachClient cc : active) {
-            List<com.fitnesshub.workout.WorkoutSession> todaySessions = workoutSessionRepository
-                    .findByClientIdAndStartedAtBetween(cc.getClientId(), now.minus(1, ChronoUnit.DAYS), now);
-            if (todaySessions.stream().anyMatch(s -> s.getStatus() != WorkoutSessionStatus.NOT_STARTED)) {
-                trainingToday++;
-            }
-        }
+        var snapshots = coachClientService.snapshotsFor(activeIds);
+        List<ClientSummaryDto> summaries = snapshots.values().stream()
+                .map(snapshot -> coachClientService.toSummary(snapshot, now))
+                .toList();
+
+        Instant dayAgo = now.minus(1, ChronoUnit.DAYS);
+        int trainingToday = (int) snapshots.values().stream()
+                .filter(snapshot -> snapshot.recentSessions().stream().anyMatch(s ->
+                        s.getStatus() != WorkoutSessionStatus.NOT_STARTED
+                                && !s.getStartedAt().isBefore(dayAgo) && !s.getStartedAt().isAfter(now)))
+                .count();
 
         List<BigDecimal> adherenceValues = summaries.stream()
                 .map(ClientSummaryDto::adherencePercentage).filter(v -> v != null).toList();
@@ -139,13 +154,11 @@ public class DashboardService {
                 .filter(s -> !s.attentionFlags().isEmpty())
                 .toList();
 
-        var recentPrs = personalRecordService.recentForCoach(coachId, 10);
-        long unreadMessages = conversationRepository.findByCoachId(coachId).stream()
-                .mapToLong(conv -> messageRepository.countByConversationIdAndSenderIdNotAndReadAtIsNull(conv.getId(), coachId))
-                .sum();
-        long pendingCheckIns = checkInService.pendingReviewForCoach(coachId).size();
+        var recentPrs = personalRecordService.recentForClients(activeIds, 10);
+        long unreadMessages = messageRepository.countUnreadForCoach(coachId);
+        long pendingCheckIns = checkInService.countPendingReview(activeIds);
 
-        return new CoachDashboardDto(totalClients, active.size(), trainingToday, avgAdherence, avgWeightChange,
+        return new CoachDashboardDto(all.size(), activeIds.size(), trainingToday, avgAdherence, avgWeightChange,
                 needingAttention, recentPrs, unreadMessages, pendingCheckIns);
     }
 

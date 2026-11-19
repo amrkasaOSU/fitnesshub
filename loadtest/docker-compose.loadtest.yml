@@ -1,0 +1,93 @@
+# Isolated stack for load tests and query analysis. Separate from
+# docker-compose.yml so it can run next to a local dev stack: nothing here
+# binds 3000, 5432, 6379 or 8080.
+#
+#   docker compose -f loadtest/docker-compose.loadtest.yml up -d --build
+#   k6 run loadtest/k6/read-mix.js -e VUS=100
+#   docker compose -f loadtest/docker-compose.loadtest.yml down -v
+#
+# The backend runs the default (non-prod) profile on an empty database, so the
+# demo seeder populates it on first boot. Every run therefore starts from the
+# same seeded dataset.
+name: fitnesshub-loadtest
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: fitnesshub
+      POSTGRES_USER: fitnesshub
+      POSTGRES_PASSWORD: fitnesshub_dev_password
+    # pg_stat_statements records every statement the app runs with call counts
+    # and timings - it's how the slowest queries in RESULTS.md were found.
+    command:
+      - postgres
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - pg_stat_statements.track=all
+      - -c
+      - track_io_timing=on
+    ports:
+      - "15432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fitnesshub"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: ../backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/fitnesshub
+      POSTGRES_USER: fitnesshub
+      POSTGRES_PASSWORD: fitnesshub_dev_password
+      REDIS_URL: redis://redis:6379
+      FRONTEND_URL: http://localhost:13000
+      COOKIE_SECURE: "false"
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      # The app allows a free client 5 AI questions a day. The evaluation in
+      # loadtest/ai-eval asks each seeded client up to 10, so it raises the
+      # cap with AI_EVAL_DAILY_LIMIT; unset, the normal limit applies.
+      FITNESSHUB_AI_RATELIMITS_FREEPERDAY: ${AI_EVAL_DAILY_LIMIT:-5}
+      # Set EXERCISE_CACHE=false to A/B the exercise catalog cache.
+      FITNESSHUB_CACHE_EXERCISECATALOG_ENABLED: ${EXERCISE_CACHE:-true}
+      # Quieter logs: DEBUG logging to stdout would itself become the bottleneck
+      # at a few hundred requests per second.
+      LOGGING_LEVEL_COM_FITNESSHUB: INFO
+    ports:
+      - "18080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+
+  # Only needed for Lighthouse and Playwright: `--profile ui`.
+  frontend:
+    profiles: ["ui"]
+    build:
+      context: ../frontend
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:18080
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "13000:3000"

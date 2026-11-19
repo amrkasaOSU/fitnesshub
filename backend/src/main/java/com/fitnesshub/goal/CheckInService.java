@@ -81,6 +81,11 @@ public class CheckInService {
         return checkInRepository.findByClientIdInAndCoachReviewedAtIsNullOrderBySubmittedAtAsc(clientIds);
     }
 
+    @Transactional(readOnly = true)
+    public long countPendingReview(List<UUID> clientIds) {
+        return clientIds.isEmpty() ? 0 : checkInRepository.countByClientIdInAndCoachReviewedAtIsNull(clientIds);
+    }
+
     @Transactional
     public CheckIn review(UUID checkInId, ReviewCheckInRequest request) {
         CheckIn checkIn = checkInRepository.findById(checkInId)

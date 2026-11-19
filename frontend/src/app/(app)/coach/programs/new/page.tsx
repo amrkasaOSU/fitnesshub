@@ -207,7 +207,7 @@ export default function NewProgramPage() {
               {day.exercises.map((ex) => (
                 <div key={ex.key} className="flex flex-wrap items-end gap-2 rounded-md border p-2">
                   <div className="min-w-48 flex-1">
-                    <Label className="text-[11px]">Exercise</Label>
+                    <Label className="text-xs">Exercise</Label>
                     <Select
                       value={ex.exerciseId}
                       onValueChange={(v) => updateExercise(day.key, ex.key, { exerciseId: v })}
@@ -232,7 +232,7 @@ export default function NewProgramPage() {
                     ["Rest (s)", "restSeconds"],
                   ] as const).map(([label, field]) => (
                     <div key={field} className="w-20">
-                      <Label className="text-[11px]">{label}</Label>
+                      <Label className="text-xs">{label}</Label>
                       <Input
                         className="h-8"
                         type="number"

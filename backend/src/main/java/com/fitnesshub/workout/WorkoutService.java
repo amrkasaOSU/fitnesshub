@@ -5,6 +5,7 @@ import com.fitnesshub.audit.AuditService;
 import com.fitnesshub.common.exception.ConflictException;
 import com.fitnesshub.common.exception.NotFoundException;
 import com.fitnesshub.exercise.Exercise;
+import com.fitnesshub.exercise.ExerciseCatalog;
 import com.fitnesshub.exercise.ExerciseRepository;
 import com.fitnesshub.coach.CoachClientRepository;
 import com.fitnesshub.coach.CoachClientStatus;
@@ -68,6 +69,7 @@ public class WorkoutService {
     private final ProgramDayRepository programDayRepository;
     private final ProgramExerciseRepository programExerciseRepository;
     private final ExerciseRepository exerciseRepository;
+    private final ExerciseCatalog exerciseCatalog;
     private final PersonalRecordService personalRecordService;
     private final PersonalRecordRepository personalRecordRepository;
     private final ProgressionService progressionService;
@@ -87,6 +89,7 @@ public class WorkoutService {
                            ProgramDayRepository programDayRepository,
                            ProgramExerciseRepository programExerciseRepository,
                            ExerciseRepository exerciseRepository,
+                           ExerciseCatalog exerciseCatalog,
                            PersonalRecordService personalRecordService,
                            PersonalRecordRepository personalRecordRepository,
                            ProgressionService progressionService,
@@ -105,6 +108,7 @@ public class WorkoutService {
         this.programDayRepository = programDayRepository;
         this.programExerciseRepository = programExerciseRepository;
         this.exerciseRepository = exerciseRepository;
+        this.exerciseCatalog = exerciseCatalog;
         this.personalRecordService = personalRecordService;
         this.personalRecordRepository = personalRecordRepository;
         this.progressionService = progressionService;
@@ -145,19 +149,28 @@ public class WorkoutService {
         }
         ClientProgram active = activeOpt.get();
         List<ProgramDay> days = programDayRepository.findByProgramIdOrderByDayNumberAsc(active.getProgramId());
-        if (days.isEmpty()) {
+        return cycleDay(active, days, date, skipsEarlierInWeek(clientId, clientTimezone, date));
+    }
+
+    /**
+     * The cycle arithmetic on its own, with no I/O: which day of the program a
+     * date lands on, given how many skips have already pushed the week back.
+     * Both the single-date lookup above and the week strip go through this, so
+     * the two can never disagree about what a date holds.
+     */
+    static Optional<ProgramDay> cycleDay(ClientProgram active, List<ProgramDay> days, LocalDate date, long skips) {
+        if (active == null || days.isEmpty()) {
             return Optional.empty();
         }
         long daysSinceStart = ChronoUnit.DAYS.between(active.getStartDate(), date);
         if (daysSinceStart < 0) {
             return Optional.empty();
         }
-        long shifted = daysSinceStart - skipsEarlierInWeek(clientId, clientTimezone, date);
+        long shifted = daysSinceStart - skips;
         if (shifted < 0) {
             return Optional.empty();
         }
-        int index = (int) (shifted % days.size());
-        return Optional.of(days.get(index));
+        return Optional.of(days.get((int) (shifted % days.size())));
     }
 
     /**
@@ -207,6 +220,12 @@ public class WorkoutService {
 
         ProgramDay programDay = resolveTodayProgramDay(clientId, clientTimezone).orElse(null);
         WorkoutSession session = new WorkoutSession(clientId, programDay == null ? null : programDay.getId());
+        // This runs whenever the client merely looks at today's plan, so it must
+        // not look like training: the constructor's IN_PROGRESS is right for an
+        // explicitly started workout, not for this. logSet() promotes it to
+        // IN_PROGRESS on the first set, which is what the coach's "training
+        // today" count relies on.
+        session.setStatus(WorkoutSessionStatus.NOT_STARTED);
         return sessionRepository.save(session);
     }
 
@@ -222,18 +241,34 @@ public class WorkoutService {
         ZoneId zone = safeZone(clientTimezone);
         LocalDate today = LocalDate.now(zone);
         LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        Instant weekStartInstant = weekStart.atStartOfDay(zone).toInstant();
 
+        // Everything the seven days need, loaded once: the week's sessions, the
+        // active program, its days, and which of those days prescribe work.
+        // The per-day loop below is then arithmetic over these, not queries.
         List<WorkoutSession> weekSessions = sessionRepository.findByClientIdAndStartedAtBetween(
-                clientId,
-                weekStart.atStartOfDay(zone).toInstant(),
-                weekStart.plusDays(7).atStartOfDay(zone).toInstant());
+                clientId, weekStartInstant, weekStart.plusDays(7).atStartOfDay(zone).toInstant());
+        ClientProgram active = clientProgramRepository
+                .findFirstByClientIdAndStatusOrderByStartDateDesc(clientId, ClientProgramStatus.ACTIVE)
+                .orElse(null);
+        List<ProgramDay> days = active == null ? List.of()
+                : programDayRepository.findByProgramIdOrderByDayNumberAsc(active.getProgramId());
+        java.util.Set<UUID> daysWithExercises = days.isEmpty() ? java.util.Set.of()
+                : programExerciseRepository
+                        .findByProgramDayIdInOrderByOrderIndexAsc(days.stream().map(ProgramDay::getId).toList())
+                        .stream().map(ProgramExercise::getProgramDayId).collect(Collectors.toSet());
 
         List<WeekDayDto> week = new java.util.ArrayList<>(7);
         for (int i = 0; i < 7; i++) {
             LocalDate date = weekStart.plusDays(i);
-            ProgramDay day = resolveProgramDayFor(clientId, clientTimezone, date).orElse(null);
-            boolean restDay = day == null
-                    || programExerciseRepository.findByProgramDayIdOrderByOrderIndexAsc(day.getId()).isEmpty();
+            Instant dayStart = date.atStartOfDay(zone).toInstant();
+            // Same half-open [Monday, this day) window skipsEarlierInWeek counts.
+            long skipsBefore = weekSessions.stream()
+                    .filter(s -> s.getStatus() == WorkoutSessionStatus.SKIPPED)
+                    .filter(s -> !s.getStartedAt().isBefore(weekStartInstant) && s.getStartedAt().isBefore(dayStart))
+                    .count();
+            ProgramDay day = cycleDay(active, days, date, skipsBefore).orElse(null);
+            boolean restDay = day == null || !daysWithExercises.contains(day.getId());
 
             WorkoutSession session = weekSessions.stream()
                     .filter(s -> LocalDate.ofInstant(s.getStartedAt(), zone).equals(date))
@@ -251,7 +286,7 @@ public class WorkoutService {
                     session == null ? null : session.getId(),
                     session == null ? null : session.getStatus(),
                     session == null ? null : session.getSkipReason(),
-                    skipsEarlierInWeek(clientId, clientTimezone, date) > 0));
+                    skipsBefore > 0));
         }
         return week;
     }
@@ -331,19 +366,23 @@ public class WorkoutService {
         List<UUID> exerciseIds = prescribed.isEmpty()
                 ? loggedExercises.stream().map(WorkoutExercise::getExerciseId).distinct().toList()
                 : prescribed.stream().map(ProgramExercise::getExerciseId).distinct().toList();
-        Map<UUID, String> exerciseNames = exerciseRepository.findAllById(exerciseIds).stream()
-                .collect(Collectors.toMap(Exercise::getId, Exercise::getName));
+        Map<UUID, String> exerciseNames = exerciseCatalog.namesById();
+
+        Map<UUID, PreviousPerformanceDto> previousByExercise =
+                previousPerformance(session.getClientId(), exerciseIds, session.getId());
 
         List<WorkoutExerciseDto> exerciseDtos;
         if (!prescribed.isEmpty()) {
             exerciseDtos = prescribed.stream().map(pe -> buildExerciseDto(
-                    session, pe.getExerciseId(), exerciseNames.get(pe.getExerciseId()), pe.getOrderIndex(),
+                    pe.getExerciseId(), exerciseNames.get(pe.getExerciseId()), pe.getOrderIndex(),
                     pe.getSets(), pe.getTargetReps(), pe.getTargetWeight(), pe.getTargetRpe(), pe.getRestSeconds(),
-                    pe.getProgressionStrategy(), loggedByExerciseId, setsByWorkoutExercise)).toList();
+                    pe.getProgressionStrategy(), loggedByExerciseId, setsByWorkoutExercise,
+                    previousByExercise)).toList();
         } else {
             exerciseDtos = loggedExercises.stream().map(we -> buildExerciseDto(
-                    session, we.getExerciseId(), exerciseNames.get(we.getExerciseId()), we.getOrderIndex(),
-                    null, null, null, null, null, null, loggedByExerciseId, setsByWorkoutExercise)).toList();
+                    we.getExerciseId(), exerciseNames.get(we.getExerciseId()), we.getOrderIndex(),
+                    null, null, null, null, null, null, loggedByExerciseId, setsByWorkoutExercise,
+                    previousByExercise)).toList();
         }
 
         List<WorkoutSet> allSets = setsByWorkoutExercise.values().stream().flatMap(List::stream).toList();
@@ -362,49 +401,66 @@ public class WorkoutService {
                 totalVolume, countPrsForSession(session), exerciseDtos, feedback, session.getSkipReason());
     }
 
-    private WorkoutExerciseDto buildExerciseDto(WorkoutSession session, UUID exerciseId, String exerciseName,
+    private WorkoutExerciseDto buildExerciseDto(UUID exerciseId, String exerciseName,
                                                  int orderIndex, Integer targetSets, Integer targetReps,
                                                  BigDecimal targetWeight, BigDecimal targetRpe, Integer restSeconds,
                                                  com.fitnesshub.program.ProgressionStrategy strategy,
                                                  Map<UUID, WorkoutExercise> loggedByExerciseId,
-                                                 Map<UUID, List<WorkoutSet>> setsByWorkoutExercise) {
+                                                 Map<UUID, List<WorkoutSet>> setsByWorkoutExercise,
+                                                 Map<UUID, PreviousPerformanceDto> previousByExercise) {
         WorkoutExercise logged = loggedByExerciseId.get(exerciseId);
         List<WorkoutSet> completedSets = logged == null ? List.of()
                 : setsByWorkoutExercise.getOrDefault(logged.getId(), List.of());
-
-        PreviousPerformanceDto previous = findPreviousPerformance(session.getClientId(), exerciseId, session.getId());
-
         return new WorkoutExerciseDto(
                 logged == null ? null : logged.getId(), exerciseId, exerciseName, orderIndex,
-                targetSets, targetReps, targetWeight, targetRpe, restSeconds, strategy, previous,
+                targetSets, targetReps, targetWeight, targetRpe, restSeconds, strategy,
+                previousByExercise.get(exerciseId),
                 completedSets.stream().map(this::toSetDto).toList());
+    }
+
+    /**
+     * "Last time" for a batch of exercises in a single query: for each one,
+     * the best valid set from the most recent completed session containing it
+     * (see {@link WorkoutSetRepository#findPreviousBestSets}). Exercises the
+     * client has never completed are simply absent from the map.
+     *
+     * <p>This used to walk the client's last 20 sessions once per exercise,
+     * two queries a session. It is now one query however long the history or
+     * the workout, and no longer stops looking after 20 sessions.
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, PreviousPerformanceDto> previousPerformance(UUID clientId, List<UUID> exerciseIds,
+                                                                 UUID excludeSessionId) {
+        if (exerciseIds.isEmpty()) {
+            return Map.of();
+        }
+        // A session that has never been saved has no id; nothing can match it, but SQL needs a value.
+        UUID exclude = excludeSessionId == null ? new UUID(0L, 0L) : excludeSessionId;
+        Map<UUID, PreviousPerformanceDto> byExercise = new java.util.HashMap<>();
+        for (Object[] row : workoutSetRepository.findPreviousBestSets(clientId, exclude, exerciseIds)) {
+            byExercise.put((UUID) row[0], new PreviousPerformanceDto(
+                    toInstant(row[1]), (BigDecimal) row[2], ((Number) row[3]).intValue(), (BigDecimal) row[4]));
+        }
+        return byExercise;
     }
 
     @Transactional(readOnly = true)
     public PreviousPerformanceDto findPreviousPerformance(UUID clientId, UUID exerciseId, UUID excludeSessionId) {
-        List<WorkoutSession> recentSessions = sessionRepository.findCompletedForClient(clientId).stream()
-                .filter(s -> !s.getId().equals(excludeSessionId))
-                .limit(20)
-                .toList();
-        for (WorkoutSession session : recentSessions) {
-            Optional<WorkoutExercise> we = workoutExerciseRepository
-                    .findByWorkoutSessionIdAndExerciseId(session.getId(), exerciseId);
-            if (we.isEmpty()) {
-                continue;
-            }
-            List<WorkoutSet> sets = workoutSetRepository
-                    .findByWorkoutExerciseIdOrderBySetNumberAsc(we.get().getId()).stream()
-                    .filter(WorkoutSet::isValidForOneRepMaxAndPr)
-                    .toList();
-            if (sets.isEmpty()) {
-                continue;
-            }
-            WorkoutSet best = sets.stream()
-                    .max(Comparator.comparing(WorkoutSet::getWeight).thenComparing(WorkoutSet::getReps))
-                    .orElseThrow();
-            return new PreviousPerformanceDto(best.getCompletedAt(), best.getWeight(), best.getReps(), best.getRpe());
+        return previousPerformance(clientId, List.of(exerciseId), excludeSessionId).get(exerciseId);
+    }
+
+    /** Native queries hand timestamps back in whichever java.time or java.sql type the driver chose. */
+    private static Instant toInstant(Object value) {
+        if (value instanceof Instant instant) {
+            return instant;
         }
-        return null;
+        if (value instanceof java.time.OffsetDateTime offset) {
+            return offset.toInstant();
+        }
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toInstant();
+        }
+        throw new IllegalStateException("Unexpected timestamp type: " + (value == null ? "null" : value.getClass()));
     }
 
     private WorkoutSetDto toSetDto(WorkoutSet s) {
@@ -526,18 +582,81 @@ public class WorkoutService {
 
     @Transactional(readOnly = true)
     public WorkoutSummaryDto toSummaryDto(WorkoutSession session) {
-        ProgramDay day = session.getProgramDayId() == null ? null
-                : programDayRepository.findById(session.getProgramDayId()).orElse(null);
+        return toSummaryDtos(List.of(session)).get(session.getId());
+    }
+
+    /**
+     * Summaries for a page of one client's sessions, keyed by session id.
+     *
+     * <p>Five queries for the whole page - day names, logged exercises, sets,
+     * and personal records - where building each row on its own cost four
+     * queries per session (80 for a default 20-row page).
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, WorkoutSummaryDto> toSummaryDtos(List<WorkoutSession> sessions) {
+        if (sessions.isEmpty()) {
+            return Map.of();
+        }
+        List<UUID> sessionIds = sessions.stream().map(WorkoutSession::getId).toList();
+
+        Map<UUID, String> dayNames = programDayRepository.findAllById(
+                        sessions.stream().map(WorkoutSession::getProgramDayId)
+                                .filter(java.util.Objects::nonNull).distinct().toList())
+                .stream().collect(Collectors.toMap(ProgramDay::getId, ProgramDay::getName));
+
         List<WorkoutExercise> exercises = workoutExerciseRepository
-                .findByWorkoutSessionIdOrderByOrderIndexAsc(session.getId());
-        List<WorkoutSet> sets = exercises.isEmpty() ? List.of()
+                .findByWorkoutSessionIdInOrderByOrderIndexAsc(sessionIds);
+        Map<UUID, UUID> sessionByWorkoutExercise = exercises.stream()
+                .collect(Collectors.toMap(WorkoutExercise::getId, WorkoutExercise::getWorkoutSessionId));
+        Map<UUID, List<WorkoutSet>> setsBySession = exercises.isEmpty() ? Map.of()
                 : workoutSetRepository.findByWorkoutExerciseIdInOrderBySetNumberAsc(
-                        exercises.stream().map(WorkoutExercise::getId).toList());
-        BigDecimal volume = progressionService.totalVolume(sets);
-        BigDecimal avgRpe = progressionService.averageRpe(sets);
-        return new WorkoutSummaryDto(session.getId(), day == null ? "Workout" : day.getName(),
-                session.getStartedAt(), session.getDurationSeconds(), volume, avgRpe, session.getStatus(),
-                countPrsForSession(session), session.getSkipReason());
+                                exercises.stream().map(WorkoutExercise::getId).toList())
+                        .stream().collect(Collectors.groupingBy(
+                                set -> sessionByWorkoutExercise.get(set.getWorkoutExerciseId())));
+
+        Map<UUID, Integer> prCounts = countPrsForSessions(sessions);
+
+        Map<UUID, WorkoutSummaryDto> summaries = new java.util.HashMap<>();
+        for (WorkoutSession session : sessions) {
+            List<WorkoutSet> sets = setsBySession.getOrDefault(session.getId(), List.of());
+            summaries.put(session.getId(), new WorkoutSummaryDto(
+                    session.getId(),
+                    session.getProgramDayId() == null ? "Workout"
+                            : dayNames.getOrDefault(session.getProgramDayId(), "Workout"),
+                    session.getStartedAt(), session.getDurationSeconds(),
+                    progressionService.totalVolume(sets), progressionService.averageRpe(sets),
+                    session.getStatus(), prCounts.getOrDefault(session.getId(), 0), session.getSkipReason()));
+        }
+        return summaries;
+    }
+
+    /**
+     * PRs achieved during each session, from one query per client covering the
+     * span of the whole page; each record is then matched to the session whose
+     * start-to-finish window (padded a second either side) contains it.
+     */
+    private Map<UUID, Integer> countPrsForSessions(List<WorkoutSession> sessions) {
+        Map<UUID, Integer> counts = new java.util.HashMap<>();
+        Map<UUID, List<WorkoutSession>> finishedByClient = sessions.stream()
+                .filter(s -> s.getCompletedAt() != null)
+                .collect(Collectors.groupingBy(WorkoutSession::getClientId));
+        finishedByClient.forEach((clientId, finished) -> {
+            Instant earliest = finished.stream().map(WorkoutSession::getStartedAt)
+                    .min(Comparator.naturalOrder()).orElseThrow().minusSeconds(1);
+            Instant latest = finished.stream().map(WorkoutSession::getCompletedAt)
+                    .max(Comparator.naturalOrder()).orElseThrow().plusSeconds(1);
+            List<PersonalRecord> records = personalRecordRepository
+                    .findByClientIdAndAchievedAtBetween(clientId, earliest, latest);
+            for (WorkoutSession session : finished) {
+                Instant windowStart = session.getStartedAt().minusSeconds(1);
+                Instant windowEnd = session.getCompletedAt().plusSeconds(1);
+                int count = (int) records.stream()
+                        .filter(r -> !r.getAchievedAt().isBefore(windowStart) && !r.getAchievedAt().isAfter(windowEnd))
+                        .count();
+                counts.put(session.getId(), count);
+            }
+        });
+        return counts;
     }
 
     private int countPrsForSession(WorkoutSession session) {

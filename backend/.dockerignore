@@ -1,0 +1,3 @@
+# The image builds from source; shipping the host's target/ only bloats the
+# build context and invalidates the layer cache.
+target

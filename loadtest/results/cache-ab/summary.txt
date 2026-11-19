@@ -1,0 +1,4 @@
+cache=true round 1: 5755 req/s  p50 8.20 ms  p95 12.76 ms  p99 16.14 ms  errors 0.00%
+cache=false round 1: 4081 req/s  p50 11.10 ms  p95 21.52 ms  p99 30.09 ms  errors 0.00%
+cache=true round 2: 5051 req/s  p50 9.38 ms  p95 14.54 ms  p99 18.99 ms  errors 0.00%
+cache=false round 2: 3337 req/s  p50 13.30 ms  p95 27.38 ms  p99 40.21 ms  errors 0.00%

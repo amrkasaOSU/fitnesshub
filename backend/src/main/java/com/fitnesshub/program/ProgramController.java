@@ -45,7 +45,8 @@ public class ProgramController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int pageSize) {
         Page<Program> result = programService.listForCurrentCoach(PageRequest.of(page, Math.min(pageSize, 100)));
-        return ApiResponse.of(PageResponse.from(result.map(programService::toSummaryDto)));
+        var summaries = programService.toSummaryDtos(result.getContent());
+        return ApiResponse.of(PageResponse.from(result.map(program -> summaries.get(program.getId()))));
     }
 
     @GetMapping("/{id}")

@@ -118,6 +118,7 @@ export default function LogPage() {
                 inputMode="decimal"
                 step="0.1"
                 placeholder="Weight"
+                aria-label="Body weight"
                 value={weightInput}
                 onChange={(e) => setWeightInput(e.target.value)}
               />
@@ -144,6 +145,7 @@ export default function LogPage() {
                 type="number"
                 inputMode="numeric"
                 placeholder="Steps"
+                aria-label="Steps today"
                 value={stepsInput}
                 onChange={(e) => setStepsInput(e.target.value)}
               />

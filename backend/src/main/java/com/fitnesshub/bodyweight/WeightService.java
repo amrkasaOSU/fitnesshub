@@ -89,21 +89,31 @@ public class WeightService {
 
         LocalDate today = LocalDate.now(zone);
         LocalDate currentWeekMonday = today.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
-        LocalDate lastCompletedWeekStart = currentWeekMonday.minusWeeks(1);
-        LocalDate weekBeforeThatStart = currentWeekMonday.minusWeeks(2);
-
-        BigDecimal lastWeekAvg = weeklyAverage(all, zone, lastCompletedWeekStart);
-        BigDecimal priorWeekAvg = weeklyAverage(all, zone, weekBeforeThatStart);
+        BigDecimal lastWeekAvg = weeklyAverage(all, zone, currentWeekMonday.minusWeeks(1));
 
         String message = lastWeekAvg == null ? "No complete weekly average yet." : null;
-        BigDecimal weeklyChange = (lastWeekAvg != null && priorWeekAvg != null)
-                ? lastWeekAvg.subtract(priorWeekAvg).setScale(2, RoundingMode.HALF_UP) : null;
+        BigDecimal weeklyChange = weeklyChange(all, zone, today);
 
         BigDecimal monthlyChange = periodChange(all, today.minusDays(30), today, today.minusDays(60), today.minusDays(30));
         BigDecimal totalChange = current.subtract(starting).setScale(2, RoundingMode.HALF_UP);
 
         return new WeightDashboardDto(current, starting, lowest, highest, lastWeekAvg, message, weeklyChange,
                 monthlyChange, totalChange, profile == null ? null : profile.getTargetWeight());
+    }
+
+    /**
+     * Last completed Monday-Sunday week's average minus the week before it, or
+     * null if either week has no weigh-ins. Shared by the client's dashboard
+     * and the coach's roster so both always show the same figure.
+     */
+    public BigDecimal weeklyChange(List<WeightEntry> entries, ZoneId zone, LocalDate today) {
+        LocalDate currentWeekMonday = today.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
+        BigDecimal lastWeekAvg = weeklyAverage(entries, zone, currentWeekMonday.minusWeeks(1));
+        BigDecimal priorWeekAvg = weeklyAverage(entries, zone, currentWeekMonday.minusWeeks(2));
+        if (lastWeekAvg == null || priorWeekAvg == null) {
+            return null;
+        }
+        return lastWeekAvg.subtract(priorWeekAvg).setScale(2, RoundingMode.HALF_UP);
     }
 
     /** Arithmetic mean of entries within the Monday-Sunday week starting at {@code mondayOfWeek}, in {@code zone}. */

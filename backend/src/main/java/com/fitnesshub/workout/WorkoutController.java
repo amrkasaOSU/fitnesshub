@@ -87,7 +87,8 @@ public class WorkoutController {
         UUID resolvedClientId = authorizationService.resolveClientId(clientId);
         Page<WorkoutSession> result = workoutService.history(resolvedClientId,
                 PageRequest.of(page, Math.min(pageSize, 100), Sort.by(Sort.Direction.DESC, "startedAt")));
-        return ApiResponse.of(PageResponse.from(result.map(workoutService::toSummaryDto)));
+        var summaries = workoutService.toSummaryDtos(result.getContent());
+        return ApiResponse.of(PageResponse.from(result.map(session -> summaries.get(session.getId()))));
     }
 
     @GetMapping("/{id}")

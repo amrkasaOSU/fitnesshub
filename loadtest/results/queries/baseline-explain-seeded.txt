@@ -1,0 +1,71 @@
+-- Seeded data (6 users, 60 sessions, 1,044 sets). 2026-11-17T06:39:55Z
+
+-- 1. workout_exercises by session (20,003 calls in the sampled window)
+                                                    QUERY PLAN                                                     
+-------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=5.89..5.90 rows=4 width=100) (actual time=0.028..0.029 rows=4 loops=1)
+   Sort Key: order_index
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=6
+   ->  Seq Scan on workout_exercises  (cost=0.00..5.85 rows=4 width=100) (actual time=0.013..0.014 rows=4 loops=1)
+         Filter: (workout_session_id = '8afcfa77-783f-4e9c-9625-c407c98c7aa5'::uuid)
+         Rows Removed by Filter: 224
+         Buffers: shared hit=3
+ Planning:
+   Buffers: shared hit=114
+ Planning Time: 0.215 ms
+ Execution Time: 0.049 ms
+(12 rows)
+
+-- 2. workout_sets by workout_exercise (36,268 calls)
+                                                                    QUERY PLAN                                                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=14.20..14.21 rows=4 width=89) (actual time=0.027..0.028 rows=4 loops=1)
+   Sort Key: set_number
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=6
+   ->  Bitmap Heap Scan on workout_sets  (cost=4.31..14.16 rows=4 width=89) (actual time=0.018..0.019 rows=4 loops=1)
+         Recheck Cond: (workout_exercise_id = 'a73aecc7-8453-4cb0-994d-81d15e807646'::uuid)
+         Heap Blocks: exact=1
+         Buffers: shared hit=3
+         ->  Bitmap Index Scan on idx_workout_sets_workout_exercise_id  (cost=0.00..4.31 rows=4 width=0) (actual time=0.010..0.011 rows=4 loops=1)
+               Index Cond: (workout_exercise_id = 'a73aecc7-8453-4cb0-994d-81d15e807646'::uuid)
+               Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=150
+ Planning Time: 0.354 ms
+ Execution Time: 0.057 ms
+(15 rows)
+
+-- 3. completed sessions for a client, newest first
+                                                      QUERY PLAN                                                       
+-----------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=3.38..3.43 rows=23 width=174) (actual time=0.027..0.028 rows=23 loops=1)
+   Sort Key: started_at DESC
+   Sort Method: quicksort  Memory: 27kB
+   Buffers: shared hit=5
+   ->  Seq Scan on workout_sessions  (cost=0.00..2.85 rows=23 width=174) (actual time=0.006..0.012 rows=23 loops=1)
+         Filter: ((client_id = '74b6de9a-29e4-4d50-a100-c2f7fa35239c'::uuid) AND ((status)::text = 'COMPLETED'::text))
+         Rows Removed by Filter: 37
+         Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=147
+ Planning Time: 0.275 ms
+ Execution Time: 0.045 ms
+(12 rows)
+
+-- 4. unread notification count (polled every 30 s by every open tab)
+                                                   QUERY PLAN                                                   
+----------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=13.96..13.97 rows=1 width=8) (actual time=0.074..0.076 rows=1 loops=1)
+   Buffers: shared hit=9
+   ->  Seq Scan on notifications  (cost=0.00..13.80 rows=64 width=0) (actual time=0.005..0.070 rows=64 loops=1)
+         Filter: ((read_at IS NULL) AND (user_id = '74b6de9a-29e4-4d50-a100-c2f7fa35239c'::uuid))
+         Rows Removed by Filter: 320
+         Buffers: shared hit=9
+ Planning:
+   Buffers: shared hit=79
+ Planning Time: 0.235 ms
+ Execution Time: 0.106 ms
+(10 rows)
+

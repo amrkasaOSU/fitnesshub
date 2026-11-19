@@ -7,9 +7,10 @@ import type { PageResponse, WorkoutSummaryDto } from "@/lib/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { QueryError } from "@/components/query-error";
 
 export default function WorkoutHistoryPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["workouts", "history"],
     queryFn: () => api.get<PageResponse<WorkoutSummaryDto>>("/api/workouts", { pageSize: 30 }),
   });
@@ -24,8 +25,11 @@ export default function WorkoutHistoryPage() {
           ))}
         </div>
       )}
+      {isError && <QueryError error={error} onRetry={() => refetch()} what="your workout history" />}
       {data?.data.length === 0 && (
-        <p className="text-sm text-muted-foreground">No workouts logged yet.</p>
+        <p className="text-sm text-muted-foreground">
+          No workouts logged yet. Finished workouts show up here with their volume and any PRs.
+        </p>
       )}
       <div className="space-y-2">
         {data?.data.map((w) => (

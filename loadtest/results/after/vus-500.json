@@ -1,0 +1,296 @@
+{
+    "root_group": {
+        "checks": {
+            "status 200": {
+                "name": "status 200",
+                "path": "::status 200",
+                "id": "fad9fa412b86fcb03bee97c80dcd61f1",
+                "passes": 36195,
+                "fails": 0
+            }
+        },
+        "name": "",
+        "path": "",
+        "id": "d41d8cd98f00b204e9800998ecf8427e",
+        "groups": {}
+    },
+    "metrics": {
+        "app_errors": {
+            "passes": 0,
+            "fails": 36195,
+            "value": 0
+        },
+        "http_req_blocked": {
+            "med": 0.003,
+            "p(90)": 0.006,
+            "p(95)": 0.008,
+            "p(99)": 0.175,
+            "max": 1.648,
+            "avg": 0.00619571341766464,
+            "min": 0
+        },
+        "iteration_duration": {
+            "p(95)": 6058.5818476,
+            "p(99)": 6081.675453819999,
+            "max": 6134.345084,
+            "avg": 5035.5513284415,
+            "min": 3011.869667,
+            "med": 6023.405125,
+            "p(90)": 6048.8442537
+        },
+        "http_req_duration{endpoint:exercises}": {
+            "p(99)": 14.8126,
+            "max": 71.146,
+            "avg": 3.71378950630035,
+            "min": 1.329,
+            "med": 2.727,
+            "p(90)": 6.871,
+            "p(95)": 9.285,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "vus": {
+            "value": 31,
+            "min": 0,
+            "max": 500
+        },
+        "http_reqs": {
+            "count": 36206,
+            "rate": 418.5992505517224
+        },
+        "checks": {
+            "passes": 36195,
+            "fails": 0,
+            "value": 1
+        },
+        "http_req_duration{endpoint:workout_history}": {
+            "p(90)": 8.7788,
+            "p(95)": 12.1758,
+            "p(99)": 21.6372,
+            "max": 68.593,
+            "avg": 5.051683906861729,
+            "min": 1.758,
+            "med": 3.793,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_failed": {
+            "fails": 36206,
+            "passes": 0,
+            "value": 0
+        },
+        "iterations": {
+            "count": 7128,
+            "rate": 82.411077112431
+        },
+        "http_req_duration": {
+            "min": 1.329,
+            "med": 4.34,
+            "p(90)": 10.182500000000001,
+            "p(95)": 13.842499999999996,
+            "p(99)": 24.735799999999998,
+            "max": 277.771,
+            "avg": 5.66264801414133
+        },
+        "http_req_duration{endpoint:coach_clients}": {
+            "avg": 7.685948793906052,
+            "min": 3.924,
+            "med": 5.726,
+            "p(90)": 12.532399999999999,
+            "p(95)": 16.536099999999998,
+            "p(99)": 29.064639999999997,
+            "max": 77.634,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_reqs{scenario:steady}": {
+            "rate": 418.4720729635859,
+            "count": 36195,
+            "thresholds": {
+                "count>=0": false
+            }
+        },
+        "http_req_duration{endpoint:workout_week}": {
+            "p(90)": 7.772,
+            "p(95)": 10.0918,
+            "p(99)": 18.22224,
+            "max": 71.722,
+            "avg": 4.395473933649281,
+            "min": 1.669,
+            "med": 3.258,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:client_dashboard}": {
+            "avg": 9.178158458685365,
+            "min": 3.435,
+            "med": 6.787,
+            "p(90)": 16.3956,
+            "p(95)": 20.9438,
+            "p(99)": 34.26452,
+            "max": 106.696,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_tls_handshaking": {
+            "med": 0,
+            "p(90)": 0,
+            "p(95)": 0,
+            "p(99)": 0,
+            "max": 0,
+            "avg": 0,
+            "min": 0
+        },
+        "http_req_sending": {
+            "max": 3.455,
+            "avg": 0.010227641827319937,
+            "min": 0.001,
+            "med": 0.008,
+            "p(90)": 0.017,
+            "p(95)": 0.02,
+            "p(99)": 0.032
+        },
+        "http_req_duration{endpoint:coach_client_workouts}": {
+            "p(90)": 9.2086,
+            "p(95)": 11.945899999999998,
+            "p(99)": 20.787839999999985,
+            "max": 66.458,
+            "avg": 5.181748201438862,
+            "min": 1.848,
+            "med": 3.804,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "data_sent": {
+            "count": 7101111,
+            "rate": 82100.19727903088
+        },
+        "vus_max": {
+            "value": 500,
+            "min": 500,
+            "max": 500
+        },
+        "http_req_waiting": {
+            "p(99)": 23.158899999999992,
+            "max": 276.774,
+            "avg": 5.133508120201094,
+            "min": 1.215,
+            "med": 3.8465,
+            "p(90)": 9.266,
+            "p(95)": 12.70375
+        },
+        "http_req_duration{endpoint:weight_dashboard}": {
+            "max": 63.345,
+            "avg": 3.9729509581701987,
+            "min": 1.48,
+            "med": 2.907,
+            "p(90)": 7.211400000000002,
+            "p(95)": 9.764,
+            "p(99)": 16.43295999999999,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "data_received": {
+            "count": 114857502,
+            "rate": 1327936.3712490457
+        },
+        "http_req_connecting": {
+            "p(90)": 0,
+            "p(95)": 0,
+            "p(99)": 0.139,
+            "max": 0.602,
+            "avg": 0.002221593106115011,
+            "min": 0,
+            "med": 0
+        },
+        "http_req_receiving": {
+            "med": 0.313,
+            "p(90)": 1.112500000000001,
+            "p(95)": 1.606,
+            "p(99)": 3.160699999999998,
+            "max": 34.583,
+            "avg": 0.5189122521129124,
+            "min": 0.007
+        },
+        "http_req_duration{endpoint:coach_dashboard}": {
+            "max": 77.584,
+            "avg": 8.612035971223031,
+            "min": 4.372,
+            "med": 6.435,
+            "p(90)": 14.706600000000002,
+            "p(95)": 18.935899999999986,
+            "p(99)": 33.096779999999974,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{endpoint:workout_today}": {
+            "avg": 5.155668040387384,
+            "min": 2.065,
+            "med": 3.782,
+            "p(90)": 9.290600000000001,
+            "p(95)": 12.258999999999999,
+            "p(99)": 20.91428,
+            "max": 89.542,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{scenario:steady}": {
+            "p(90)": 10.171600000000002,
+            "p(95)": 13.824,
+            "p(99)": 24.58006,
+            "max": 106.696,
+            "avg": 5.620248984666422,
+            "min": 1.329,
+            "med": 4.339,
+            "thresholds": {
+                "max>=0": false
+            }
+        },
+        "http_req_duration{expected_response:true}": {
+            "avg": 5.66264801414133,
+            "min": 1.329,
+            "med": 4.34,
+            "p(90)": 10.182500000000001,
+            "p(95)": 13.842499999999996,
+            "p(99)": 24.735799999999998,
+            "max": 277.771
+        }
+    },
+    "setup_data": {
+        "clients": [
+            {
+                "cookie": "MWYzZWJhYzctNDA5NC00ZWQyLTliM2EtNjdiYmM0NzBmMzQ4",
+                "id": "70e402a5-6b51-47c8-9300-bd64837b5428"
+            },
+            {
+                "cookie": "OTcyNzY4MzktYjYzOS00NGRjLWIwODEtZjc3MzhiMWNjMzIz",
+                "id": "f3caab34-0e22-436e-becb-e95ed39d5e25"
+            },
+            {
+                "id": "7298a395-14d9-4978-b86d-70e84c377625",
+                "cookie": "ZTg3YWI4ODUtNGZiYS00ZWFkLTgyZjMtZWUwZmI0ZGQ3YTYz"
+            },
+            {
+                "cookie": "NmYwYTk2ZDEtZTE5NS00ZmVlLTkzNjctYmVlMGU2NzJmZGZl",
+                "id": "7ed2bf1a-6664-4cdc-b3b4-834b31542087"
+            },
+            {
+                "cookie": "Y2Y3NjY1NzEtYTc4Yi00M2I5LTljOWItYjliZmVkNGI2ZTUx",
+                "id": "8462656c-5620-42dc-a3ce-c268afe3b39b"
+            }
+        ],
+        "coach": {
+            "cookie": "YmVjNDY2YWMtODFmMy00ODJiLTg2Y2UtNWFjYjQwZGVjNjdk",
+            "id": "c722d183-573d-4159-ad74-7c7b9d710deb"
+        }
+    }
+}

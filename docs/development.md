@@ -31,26 +31,49 @@ Reads `NEXT_PUBLIC_API_URL` (defaults to `http://localhost:8080`).
 
 ## Tests
 
+Three layers, all runnable locally and all run in CI on every push:
+
 ```bash
 cd backend
-./mvnw test
+./mvnw test      # 22 unit tests: pure calculations and the AI context, no database
+./mvnw verify    # + 81 integration tests against real PostgreSQL and Redis (needs Docker)
 ```
 
-The unit test suite (`ProgressionServiceTest`, `WeightServiceTest`,
-`AdherenceServiceTest`, and friends) is deliberately written to run with
-**no database and no Spring context** - each tests a pure calculation
-(1RM, volume, PR eligibility, weekly averages, adherence math) by
-constructing the service directly with `null` for any collaborator the method
-under test doesn't touch. That's why they run in milliseconds and don't need
-Testcontainers.
+**Unit tests** (`ProgressionServiceTest`, `WeightServiceTest`,
+`AdherenceServiceTest`, `OpenAiProviderContextTest`) construct a class
+directly and test one thing - 1RM, volume, PR eligibility, weekly averages,
+adherence, and that the AI's context actually serialises.
 
-**Testcontainers-based integration tests and Playwright E2E tests are a
-known gap.** Both need a Docker daemon, which the machine this was built on
-doesn't have (see below for how the stack was verified anyway). The seams for
-them exist (repositories,
-`AuthorizationService`, and the REST controllers are all plain Spring beans
-a `@SpringBootTest` + Testcontainers Postgres could exercise directly) - this
-is flagged as a known gap, not silently skipped.
+**Integration tests** (`backend/src/test/java/com/fitnesshub/it/`, named `*IT`)
+boot the whole application with `@SpringBootTest` against PostgreSQL 16 and
+Redis 7 containers started by Testcontainers, then drive it over HTTP the way
+the browser does - session cookie, CSRF double-submit, real Flyway migrations,
+real security filter chain. Nothing is mocked. `ApiSession` is the test's
+"browser"; `AbstractIntegrationTest` starts the containers once per run and
+the seeder gives every test a coach with five clients. Suites: `AuthFlowIT`
+(auth and sessions), `OwnershipIT` (cross-tenant access attempts against every
+client-data endpoint), `FitnessCalculationsIT` (hand-computed known answers),
+`WorkoutLifecycleIT`. Coverage lands in `backend/target/site/jacoco/`;
+`scripts/coverage-summary.py` prints the totals.
+
+If Docker runs under Colima rather than Docker Desktop, point Testcontainers
+at it first:
+
+```bash
+export DOCKER_HOST="unix://$HOME/.colima/default/docker.sock"
+export TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE=/var/run/docker.sock
+export TESTCONTAINERS_HOST_OVERRIDE=localhost
+```
+
+**End-to-end tests** (`frontend/e2e/`, Playwright) drive the production
+frontend build against the real backend in Chromium, on a desktop viewport
+and a Pixel 7:
+
+```bash
+docker compose -f loadtest/docker-compose.loadtest.yml --profile ui up -d --build
+loadtest/wait-ready.sh
+cd frontend && npm run e2e
+```
 
 ```bash
 cd frontend
@@ -59,10 +82,20 @@ npm run lint        # eslint
 npm run build       # production build (also type-checks)
 ```
 
+## Measuring performance
+
+Everything behind the numbers in [RESULTS.md](../RESULTS.md) is scripted under
+[`loadtest/`](../loadtest/): an isolated docker compose stack, a k6 read mix,
+a per-request SQL statement counter on `pg_stat_statements`, a synthetic
+200-client dataset for query plans, before/after response comparison, a
+Lighthouse runner that audits signed-in pages, and the AI assistant
+evaluation. RESULTS.md lists the exact command for each number.
+
 ## Verifying without Docker
 
-My development machine has no Docker daemon, no Homebrew, and no system
-Postgres/Redis/Node/Maven. Rather than skip integration verification and hope
+*Historical: this is how the stack was first verified, before Docker and the
+automated suites above existed.* My development machine then had no Docker
+daemon, no Homebrew, and no system Postgres/Redis/Node/Maven. Rather than skip integration verification and hope
 the code was right, I stood the whole stack up from portable, non-system
 binaries:
 

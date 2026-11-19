@@ -3,12 +3,14 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCurrentUser } from "@/lib/use-auth";
+import { useSyncTimezone } from "@/lib/use-sync-timezone";
 import { AppShell } from "@/components/app-shell";
 import { Loader2 } from "lucide-react";
 
 export default function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { data: user, isLoading, isError } = useCurrentUser();
   const router = useRouter();
+  useSyncTimezone(user);
 
   useEffect(() => {
     if (!isLoading && (isError || !user)) {

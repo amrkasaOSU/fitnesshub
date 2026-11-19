@@ -1,0 +1,110 @@
+[
+  {
+    "page": "landing",
+    "path": "/",
+    "performance": 98,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 2468,
+    "tbtMs": 7,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "login",
+    "path": "/login",
+    "performance": 97,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 2619,
+    "tbtMs": 6,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "pricing",
+    "path": "/pricing",
+    "performance": 98,
+    "accessibility": 100,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 2470,
+    "tbtMs": 9,
+    "cls": 0,
+    "failedA11y": []
+  },
+  {
+    "page": "client-dashboard",
+    "path": "/dashboard",
+    "performance": 85,
+    "accessibility": 92,
+    "bestPractices": 100,
+    "seo": 90,
+    "lcpMs": 4311,
+    "tbtMs": 16,
+    "cls": 0,
+    "failedA11y": [
+      "aria-progressbar-name",
+      "color-contrast"
+    ]
+  },
+  {
+    "page": "workout-today",
+    "path": "/workout/today",
+    "performance": 91,
+    "accessibility": 95,
+    "bestPractices": 96,
+    "seo": 100,
+    "lcpMs": 3568,
+    "tbtMs": 8,
+    "cls": 0.011,
+    "failedA11y": [
+      "color-contrast"
+    ]
+  },
+  {
+    "page": "progress",
+    "path": "/progress",
+    "performance": 87,
+    "accessibility": 89,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 4036,
+    "tbtMs": 10,
+    "cls": 0,
+    "failedA11y": [
+      "button-name",
+      "color-contrast"
+    ]
+  },
+  {
+    "page": "coach-dashboard",
+    "path": "/coach/dashboard",
+    "performance": 86,
+    "accessibility": 96,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 4306,
+    "tbtMs": 9,
+    "cls": 0,
+    "failedA11y": [
+      "color-contrast"
+    ]
+  },
+  {
+    "page": "coach-clients",
+    "path": "/coach/clients",
+    "performance": 89,
+    "accessibility": 96,
+    "bestPractices": 100,
+    "seo": 100,
+    "lcpMs": 3829,
+    "tbtMs": 11,
+    "cls": 0,
+    "failedA11y": [
+      "color-contrast"
+    ]
+  }
+]

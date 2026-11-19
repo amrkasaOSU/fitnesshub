@@ -4,8 +4,8 @@ import com.fitnesshub.ai.dto.FitnessContext;
 import com.fitnesshub.analytics.AdherenceService;
 import com.fitnesshub.analytics.dto.AdherenceResult;
 import com.fitnesshub.bodyweight.WeightService;
-import com.fitnesshub.exercise.Exercise;
-import com.fitnesshub.exercise.ExerciseRepository;
+import com.fitnesshub.exercise.ExerciseCatalog;
+import com.fitnesshub.exercise.dto.ExerciseDto;
 import com.fitnesshub.goal.GoalRepository;
 import com.fitnesshub.goal.GoalService;
 import com.fitnesshub.goal.GoalStatus;
@@ -37,7 +37,7 @@ import java.util.UUID;
 @Service
 public class FitnessContextService {
 
-    private final ExerciseRepository exerciseRepository;
+    private final ExerciseCatalog exerciseCatalog;
     private final ExerciseProgressService exerciseProgressService;
     private final PersonalRecordService personalRecordService;
     private final AdherenceService adherenceService;
@@ -49,7 +49,7 @@ public class FitnessContextService {
     private final WorkoutSessionRepository workoutSessionRepository;
     private final UserRepository userRepository;
 
-    public FitnessContextService(ExerciseRepository exerciseRepository,
+    public FitnessContextService(ExerciseCatalog exerciseCatalog,
                                   ExerciseProgressService exerciseProgressService,
                                   PersonalRecordService personalRecordService,
                                   AdherenceService adherenceService,
@@ -60,7 +60,7 @@ public class FitnessContextService {
                                   GoalService goalService,
                                   WorkoutSessionRepository workoutSessionRepository,
                                   UserRepository userRepository) {
-        this.exerciseRepository = exerciseRepository;
+        this.exerciseCatalog = exerciseCatalog;
         this.exerciseProgressService = exerciseProgressService;
         this.personalRecordService = personalRecordService;
         this.adherenceService = adherenceService;
@@ -79,9 +79,9 @@ public class FitnessContextService {
         ZoneId zone = safeZone(user.getTimezone());
         LocalDate today = LocalDate.now(zone);
 
-        Exercise matchedExercise = question == null ? null : findMentionedExercise(question);
+        ExerciseDto matchedExercise = question == null ? null : findMentionedExercise(question);
         ExerciseProgressSummary exerciseProgress = matchedExercise == null ? null
-                : exerciseProgressService.getProgress(clientId, matchedExercise.getId());
+                : exerciseProgressService.getProgress(clientId, matchedExercise.id());
 
         AdherenceResult adherence = adherenceService.calculateForClient(clientId, today.minusDays(6), today, zone);
         var recentPrs = personalRecordService.recentForClient(clientId, 5);
@@ -97,17 +97,16 @@ public class FitnessContextService {
                 .filter(s -> s.getStatus() == WorkoutSessionStatus.COMPLETED)
                 .count();
 
-        return new FitnessContext(user.getFirstName(), matchedExercise == null ? null : matchedExercise.getName(),
+        return new FitnessContext(user.getFirstName(), matchedExercise == null ? null : matchedExercise.name(),
                 exerciseProgress, recentPrs, adherence, weight, nutrition, steps, goals, completed30);
     }
 
     /** Naive but effective: the exercise library is small enough that a case-insensitive substring match works. */
-    private Exercise findMentionedExercise(String question) {
+    private ExerciseDto findMentionedExercise(String question) {
         String lower = question.toLowerCase();
-        List<Exercise> all = exerciseRepository.findAll();
-        return all.stream()
-                .filter(e -> lower.contains(e.getName().toLowerCase()))
-                .max((a, b) -> Integer.compare(a.getName().length(), b.getName().length()))
+        return exerciseCatalog.all().stream()
+                .filter(e -> lower.contains(e.name().toLowerCase()))
+                .max((a, b) -> Integer.compare(a.name().length(), b.name().length()))
                 .orElse(null);
     }
 
